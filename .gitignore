@@ -1,0 +1,14 @@
+.venv/
+.hermes/
+.env
+.env.*
+!.env.example
+.codex/
+draft_45d62069_folder/
+runtime.local.json
+__pycache__/
+frontend/node_modules/
+frontend/dist/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/

@@ -1,0 +1,14 @@
+diff --git a/tests/hermes_cli/test_win_pty_bridge.py b/tests/hermes_cli/test_win_pty_bridge.py
+index d7f0ff9..c2657d6 100644
+--- a/tests/hermes_cli/test_win_pty_bridge.py
++++ b/tests/hermes_cli/test_win_pty_bridge.py
+@@ -339,6 +339,9 @@ class TestWinPtyBridgeEnv:
+         bridge = WinPtyBridge.spawn(
+             [sys.executable, "-c", "import os; print(os.getcwd())"],
+             cwd=str(tmp_path),
++            # ConPTY wraps long temporary paths into CRLF at the default 80
++            # columns. This test checks cwd forwarding, not terminal wrapping.
++            cols=2000,
+         )
+         try:
+             # Path is case-insensitive on Windows; compare lowercased.

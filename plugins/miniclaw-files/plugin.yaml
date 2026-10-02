@@ -1,0 +1,11 @@
+name: miniclaw-files
+version: 0.1.0
+description: Bounded read-only text tools for miniclaw's first learning stage.
+provides_tools:
+  - miniclaw_read_file
+  - miniclaw_list_files
+config_schema:
+  workspace:
+    type: str
+    description: Absolute directory containing the allowed learning files.
+    required: true

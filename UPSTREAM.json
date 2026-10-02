@@ -1,0 +1,16 @@
+{
+  "repository": "https://github.com/NousResearch/hermes-agent.git",
+  "directory": "hermes-agent",
+  "tag": "v2026.9.24",
+  "commit": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "package_version": "0.21.5",
+  "python": "3.12.10",
+  "node": "24.19.0",
+  "npm": "10.9.3",
+  "python_dependency_install": "uv sync --frozen --extra web --extra dev --no-default-groups",
+  "node_dependency_install": "Run npm ci in frontend; optional upstream Dashboard requires its separate workspace install",
+  "source_status": "Official Git submodule pinned to the recorded commit; production core unchanged",
+  "local_upstream_changes": [
+    "Optional patches/windows-conpty-test-width.patch; not automatically applied"
+  ]
+}
