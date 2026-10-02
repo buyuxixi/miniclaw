@@ -1,6 +1,7 @@
 import { JsonRpcGatewayClient, gatewayUrl, type ConnectionState, type GatewayEvent } from './gateway';
 import { assistantText, finishItems, historyItems, resultFailed, storedSessionId, withToolResults } from './transcript';
 import { storedToolRows } from './history-api';
+import { prepareSkillPrompt } from './skill-prompt';
 import type { ChatState, HistoryRow, SessionRow, SessionSnapshot } from './types';
 
 const blank = (): ChatState => ({
@@ -15,6 +16,7 @@ export class ChatController {
   private listeners = new Set<() => void>();
   private selection = 0;
   private turn = 0;
+  private preparingSkill = false;
   private disposed = false;
 
   constructor() {
@@ -45,7 +47,9 @@ export class ChatController {
       await this.refresh();
       if (this.disposed) return;
       const saved = this.state.storedId || localStorage.getItem('miniclaw.selected');
-      if (saved && this.state.sessions.some(row => row.id === saved)) await this.open(saved, true);
+      // A selected older session can be outside the recent sidebar window.
+      // Resume by its durable id rather than silently replacing it on reload.
+      if (saved) await this.open(saved, true);
       else { this.patch({ busy: false }); await this.newSession(); }
     } catch (error) { this.fail(error); }
   }
@@ -95,29 +99,40 @@ export class ChatController {
     } catch (error) { if (generation === this.selection) this.fail(error); }
   }
 
-  async send(text: string): Promise<boolean> {
+  async send(text: string, skill?: string): Promise<boolean> {
     if (!text.trim() || this.state.running || this.state.busy || !this.state.sessionId || this.connection !== 'open') return false;
     const previous = this.state.items;
     const sessionId = this.state.sessionId;
-    ++this.turn;
-    this.patch({
-      items: [...previous, { id: crypto.randomUUID(), kind: 'user', text }],
-      running: true, error: '', status: '正在提交',
-    });
+    const turn = ++this.turn;
+    this.preparingSkill = Boolean(skill);
+    let submitted = false;
+    this.patch({ running: true, error: '', status: skill ? '正在加载技能' : '正在提交' });
     try {
-      await this.client.request('prompt.submit', { session_id: sessionId, text });
+      const prompt = skill ? await prepareSkillPrompt(this.client, sessionId, skill, text, () => turn === this.turn && sessionId === this.state.sessionId) : { text, display: text };
+      if (turn !== this.turn || !this.state.running || this.connection !== 'open' || sessionId !== this.state.sessionId) return false;
+      this.preparingSkill = false;
+      this.patch({ items: [...previous, { id: crypto.randomUUID(), kind: 'user', text: prompt.display }], status: '正在提交' });
+      submitted = true;
+      await this.client.request('prompt.submit', { session_id: sessionId, text: prompt.text });
       return true;
     } catch (error) {
+      if (turn !== this.turn || sessionId !== this.state.sessionId) return false;
       // An ambiguous timeout/disconnect may already have been accepted. Keep
       // the local text and recover server state; never automatically resend it.
-      this.patch({ running: false });
+      this.patch({ running: false, status: '' });
       this.fail(error);
-      if (this.connection === 'open') await this.open(this.state.storedId);
+      if (submitted && this.connection === 'open') await this.open(this.state.storedId);
       return false;
-    }
+    } finally { if (turn === this.turn) this.preparingSkill = false; }
   }
 
   async stop() {
+    if (this.preparingSkill) {
+      this.preparingSkill = false;
+      ++this.turn;
+      this.patch({ running: false, status: '' });
+      return;
+    }
     try {
       this.patch({ status: '正在停止' });
       const result = await this.client.request<{ interrupted?: boolean; status: string }>('session.interrupt', {
@@ -125,6 +140,55 @@ export class ChatController {
       });
       if (result.status === 'not_interrupted') this.patch({ running: false, status: '' });
     } catch (error) { this.fail(error); }
+  }
+
+  async rename(title: string): Promise<boolean> {
+    if (!title.trim() || this.state.running || this.state.busy || this.connection !== 'open') return false;
+    const generation = this.selection;
+    this.patch({ busy: true, error: '' });
+    try {
+      const result = await this.client.request<{ title: string }>('session.title', {
+        session_id: this.state.sessionId, title: title.trim(),
+      });
+      if (!this.disposed && generation === this.selection) {
+        this.patch({ info: { ...this.state.info, title: result.title } });
+        await this.refresh();
+      }
+      return true;
+    } catch (error) { this.fail(error); return false; }
+    finally { if (generation === this.selection) this.patch({ busy: false }); }
+  }
+
+  async compressContext(focus: string): Promise<Record<string, unknown> | undefined> {
+    if (this.state.running || this.state.busy || this.connection !== 'open') return;
+    const sessionId = this.state.sessionId;
+    const generation = this.selection;
+    this.patch({ busy: true, error: '', status: '正在压缩上下文' });
+    try {
+      const result = await this.client.request<Record<string, unknown>>('session.compress', {
+        session_id: sessionId, focus_topic: focus,
+      }, 180_000);
+      if (this.disposed || generation !== this.selection) return;
+      if (result.status === 'pending') {
+        this.patch({ running: true, status: '压缩结果未知，请重新连接以恢复后端状态' });
+        return result;
+      }
+      if (result.info) {
+        const info = { ...this.state.info, ...result.info as SessionSnapshot['info'] };
+        const storedId = info.stored_session_id || this.state.storedId;
+        localStorage.setItem('miniclaw.selected', storedId);
+        this.patch({ info, storedId });
+      }
+      await this.reconcile(sessionId, generation);
+      this.patch({ status: '' });
+      return result;
+    } catch (error) {
+      this.fail(error);
+      // A timed-out compression may still be running. Require reattachment
+      // before submitting another turn rather than automatically retrying it.
+      this.patch({ running: true, status: '压缩结果未知，请重新连接以恢复后端状态' });
+      return;
+    } finally { if (generation === this.selection) this.patch({ busy: false }); }
   }
 
   private async reconcile(sessionId: string, generation: number) {

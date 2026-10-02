@@ -28,6 +28,10 @@ export interface SessionRow {
 }
 
 export interface SessionInfo {
+  tools?: Record<string, string[]>;
+  skills?: Record<string, string[]>;
+  provider?: string;
+  usage?: { input?: number; output?: number; calls?: number; compressions?: number; cost_usd?: number | null; cost_status?: string };
   model?: string;
   title?: string;
   credential_warning?: string;
