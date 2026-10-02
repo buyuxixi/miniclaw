@@ -52,3 +52,13 @@ test('stop during skill loading prevents delayed prompt submission', async () =>
   expect(request.mock.calls.map(call => call[0])).not.toContain('prompt.submit');
   expect(controller.state.items).toEqual([]);
 });
+
+test('PDF flow without terminal is rejected before skill dispatch or model submission', async () => {
+  const { controller, request } = setup();
+  vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => [{ name: 'pdf', enabled: true }] } as Response);
+  controller.state.info.tools = { files: ['miniclaw_list_files', 'miniclaw_read_file'] };
+  expect(await controller.send('生成100个1的PDF', 'pdf')).toBe(false);
+  expect(request).not.toHaveBeenCalled();
+  expect(controller.state.items).toEqual([]);
+  expect(controller.state.error).toContain('需要终端');
+});

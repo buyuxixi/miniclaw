@@ -108,7 +108,7 @@ export class ChatController {
     let submitted = false;
     this.patch({ running: true, error: '', status: skill ? '正在加载技能' : '正在提交' });
     try {
-      const prompt = skill ? await prepareSkillPrompt(this.client, sessionId, skill, text, () => turn === this.turn && sessionId === this.state.sessionId) : { text, display: text };
+      const prompt = skill ? await prepareSkillPrompt(this.client, sessionId, skill, text, () => turn === this.turn && sessionId === this.state.sessionId, Object.values(this.state.info.tools ?? {}).flat()) : { text, display: text };
       if (turn !== this.turn || !this.state.running || this.connection !== 'open' || sessionId !== this.state.sessionId) return false;
       this.preparingSkill = false;
       this.patch({ items: [...previous, { id: crypto.randomUUID(), kind: 'user', text: prompt.display }], status: '正在提交' });
@@ -195,10 +195,11 @@ export class ChatController {
     const turn = this.turn;
     try {
       const storedId = this.state.storedId;
-      const [result, toolRows] = await Promise.all([
-        this.client.request<{ messages: HistoryRow[] }>('session.history', { session_id: sessionId }),
-        storedToolRows(storedId),
-      ]);
+      const result = await this.client.request<{ messages: HistoryRow[] }>('session.history', { session_id: sessionId });
+      if (this.disposed || generation !== this.selection || turn !== this.turn || this.state.running) return;
+      // A new empty session may exist only in the live gateway until its first
+      // persisted message. Fetch durable tool bodies only when replay has tools.
+      const toolRows = result.messages.some(row => row.role === 'tool') ? await storedToolRows(storedId) : [];
       if (this.disposed || generation !== this.selection || turn !== this.turn || this.state.running) return;
       this.patch({ items: historyItems(withToolResults(result.messages, toolRows)) });
       await this.refresh();

@@ -3,7 +3,8 @@ import { readApi, writeApi } from './management-api';
 import { ContextPanel } from './ContextPanel';
 import type { ChatController } from './chat-controller';
 import type { ChatState } from './types';
-import { skillCommandAvailable, type CommandCatalog } from './skill-prompt';
+import { Icon, type IconName } from './Icon';
+import { skillDetails, skillReadiness } from './skill-readiness';
 
 type Tab = 'general' | 'skills' | 'tools' | 'memory' | 'developer';
 interface Skill { name: string; description: string; category: string; enabled: boolean }
@@ -14,10 +15,9 @@ const toolLabels: Record<string, { title: string; description: string }> = {
   miniclaw_read_file: { title: '读取文件', description: '读取教学工作区中的文本资料，供本轮任务参考。' },
 };
 
-export function SettingsDialog({ controller, chat, onClose, initialTab = 'general', onChooseSkill }: { controller: ChatController; chat: ChatState; onClose: () => void; initialTab?: Tab; onChooseSkill: (name: string) => void }) {
+export function SettingsDialog({ controller, chat, onClose, initialTab = 'general' }: { controller: ChatController; chat: ChatState; onClose: () => void; initialTab?: Tab }) {
   const [tab, setTab] = useState<Tab>(initialTab);
   const [skills, setSkills] = useState<Skill[]>();
-  const [catalog, setCatalog] = useState<CommandCatalog>();
   const [filter, setFilter] = useState('');
   const [memory, setMemory] = useState<MemoryConfig>();
   const [memoryBytes, setMemoryBytes] = useState({ memory: 0, user: 0 });
@@ -36,7 +36,7 @@ export function SettingsDialog({ controller, chat, onClose, initialTab = 'genera
     setError('');
     if (tab !== 'skills' && tab !== 'memory') return;
     setLoading(true);
-    const task = tab === 'skills' ? Promise.all([readApi<Skill[]>('/api/skills', abort.signal), controller.client.request<CommandCatalog>('commands.catalog', { session_id: chat.sessionId })]).then(([result, commands]) => { if (!abort.signal.aborted) { setSkills(result); setCatalog(commands); } })
+    const task = tab === 'skills' ? readApi<Skill[]>('/api/skills', abort.signal).then(result => { if (!abort.signal.aborted) setSkills(result); })
       : Promise.all([readApi<{ memory: MemoryConfig }>('/api/config', abort.signal), readApi<{ builtin_files: { memory: number; user: number } }>('/api/memory', abort.signal)])
         .then(([config, state]) => { if (!abort.signal.aborted) { setMemory(config.memory); setMemoryBytes(state.builtin_files); } });
     void task.catch(reason => { if (!abort.signal.aborted) setError(String(reason)); })
@@ -65,8 +65,8 @@ export function SettingsDialog({ controller, chat, onClose, initialTab = 'genera
   }
   return <dialog ref={root} className="settings-dialog" aria-label="设置" onCancel={event => { if (busy) event.preventDefault(); else onClose(); }} onClick={event => { if (event.target === root.current && !busy) onClose(); }}>
     <div className="settings-layout">
-      <aside className="settings-nav"><div className="settings-brand">miniclaw <span>设置</span></div><nav>{tabs.map(item => <button key={item.id} className={tab === item.id ? 'active' : ''} disabled={busy} onClick={() => { setTab(item.id); setEditor(undefined); setNotice(''); }}><span>{item.icon}</span>{item.label}</button>)}</nav><p>个人工作区 · 本机</p></aside>
-      <div className="settings-content"><header><h2>{tabs.find(item => item.id === tab)?.label}</h2><button className="close-settings" aria-label="关闭设置" disabled={busy} onClick={onClose}>×</button></header>
+      <aside className="settings-nav"><div className="settings-brand">miniclaw <span>设置</span></div><nav>{tabs.map(item => <button key={item.id} className={tab === item.id ? 'active' : ''} aria-pressed={tab === item.id} disabled={busy} onClick={() => { setTab(item.id); setEditor(undefined); setNotice(''); }}><Icon name={(({ general: "settings", skills: "skills", tools: "file", memory: "chat", developer: "edit" } as Record<Tab, IconName>)[item.id])} />{item.label}</button>)}</nav><p>个人工作区 · 本机</p></aside>
+      <div className="settings-content"><header><h2>{tabs.find(item => item.id === tab)?.label}</h2><button className="close-settings" aria-label="关闭设置" disabled={busy} onClick={onClose}><Icon name="close" /></button></header>
         <div className="settings-scroll">
           {error && <div className="settings-error" role="alert">{error}</div>}{notice && <div className="settings-notice" role="status">{notice}</div>}
           {loading && <p className="muted">正在加载…</p>}
@@ -78,13 +78,13 @@ export function SettingsDialog({ controller, chat, onClose, initialTab = 'genera
             <div className="settings-note">模型和服务凭据在后端配置中管理。</div>
           </>}
           {tab === 'skills' && <>
-            <div className="settings-intro"><p className="settings-description">技能为重复任务提供操作流程。选择“用于对话”后，发送消息时才加载技能正文；开启列表开关本身不代表已加载。工具仍受当前权限限制。</p><button disabled={blocked} onClick={() => void action(async () => { const result = await controller.client.request<{ result: { total: number } }>('skills.reload', { session_id: chat.sessionId }); setRevision(v => v + 1); setNotice(`已重新扫描 ${result.result.total} 个可用技能。`); })}>重新扫描</button></div>
+            <div className="settings-intro"><p className="settings-description">在这里管理已安装的流程。使用时，从消息输入框旁的“选择技能”进入；是否能执行还取决于工具与运行环境。</p><button disabled={blocked} onClick={() => void action(async () => { const result = await controller.client.request<{ result: { total: number } }>('skills.reload', { session_id: chat.sessionId }); setRevision(v => v + 1); setNotice(`已重新扫描 ${result.result.total} 个可用技能。`); })}>重新扫描</button></div>
             {editor ? <div className="skill-editor"><button className="text-button" disabled={busy} onClick={() => setEditor(undefined)}>← 返回技能列表</button><h3>{editor.name}</h3><textarea aria-label="技能内容" value={editor.text} onChange={event => setEditor({ ...editor, text: event.target.value })} spellCheck={false} /><div className="editor-footer"><span>下次选择并发送时加载最新内容</span><button className="primary-button" disabled={blocked || editor.text === editor.original} onClick={() => void action(async () => { const latest = await readApi<{ content: string }>(`/api/skills/content?name=${encodeURIComponent(editor.name)}`); if (latest.content !== editor.original) throw new Error('技能内容已在别处修改，请重新打开后编辑。'); await writeApi('/api/skills/content', 'PUT', { name: editor.name, content: editor.text }); setEditor({ ...editor, original: editor.text }); setNotice('技能已保存。'); })}>保存修改</button></div></div>
-              : <><label className="settings-search"><span>⌕</span><input aria-label="搜索技能" placeholder="搜索技能名称或用途" value={filter} onChange={event => setFilter(event.target.value)} /></label><div className="list-caption">{skills ? `${skills.length} 个技能 · ${skills.filter(s => s.enabled).length} 个已开启` : ''}</div><div className="skill-list">{skills?.filter(skill => `${skill.name} ${skill.description}`.toLowerCase().includes(filter.toLowerCase())).map(skill => <article className="skill-card" key={skill.name}><div className="skill-symbol">✧</div><div className="skill-copy"><h3>{skill.name}</h3><p>{skill.description}</p><button className="text-button" disabled={blocked} onClick={() => void viewSkill(skill)}>查看与编辑</button><button className="text-button use-skill" disabled={blocked || !skill.enabled || !catalog || !skillCommandAvailable(catalog, skill.name)} onClick={() => onChooseSkill(skill.name)}>用于对话</button></div><button role="switch" className="toggle" aria-checked={skill.enabled} aria-label={`启用技能 ${skill.name}`} disabled={blocked} onClick={() => void toggleSkill(skill)}><span /></button></article>)}</div>{skills?.length === 0 && <div className="settings-empty"><span>✧</span><h3>还没有可用技能</h3><p>将技能安装到本机后，点击重新扫描。</p></div>}</>}
+              : <><label className="settings-search"><Icon name="search" /><input name="manage-skill-search" autoComplete="off" aria-label="搜索技能" placeholder="搜索技能名称或用途" value={filter} onChange={event => setFilter(event.target.value)} /></label><div className="list-caption">{skills ? `${skills.length} 个技能 · ${skills.filter(s => s.enabled).length} 个已开启` : ''}</div><div className="skill-list">{skills?.filter(skill => `${skillDetails(skill).title} ${skill.name} ${skill.description}`.toLowerCase().includes(filter.toLowerCase())).map(skill => <article className="skill-card" key={skill.name}><div className="skill-copy"><div className="managed-skill-title"><h3>{skillDetails(skill).title}</h3><span className={`readiness ${skillReadiness(skill, Object.values(chat.info.tools ?? {}).flat()).state}`}>{skillReadiness(skill, Object.values(chat.info.tools ?? {}).flat()).label}</span></div><span className="skill-id" translate="no">{skill.name}</span><p>{skillDetails(skill).description}</p><p className="skill-requirement">{skillReadiness(skill, Object.values(chat.info.tools ?? {}).flat()).reason}</p><button className="text-button" disabled={blocked} onClick={() => void viewSkill(skill)}>查看与编辑</button></div><button role="switch" className="toggle" aria-checked={skill.enabled} aria-label={`启用技能 ${skill.name}`} disabled={blocked} onClick={() => void toggleSkill(skill)}><span /></button></article>)}</div>{skills?.length === 0 && <div className="settings-empty"><span>✧</span><h3>还没有可用技能</h3><p>将技能安装到本机后，点击重新扫描。</p></div>}</>}
           </>}
           {tab === 'tools' && <>
             <p className="settings-description">工具是 Agent 实际执行操作的能力。以下为当前对话已加载的工具。</p>
-            <div className="tool-list">{Object.values(chat.info.tools ?? {}).flat().map(name => <article className="settings-tool-card" key={name}><div className="skill-symbol">⌘</div><div><h3>{toolLabels[name]?.title || name}</h3><p>{toolLabels[name]?.description || '当前对话可调用。'}</p><code>{name}</code></div><span className="status-pill">已加载</span></article>)}</div>
+            <div className="tool-list">{Object.values(chat.info.tools ?? {}).flat().map(name => <article className="settings-tool-card" key={name}><div className="skill-symbol"><Icon name="file" /></div><div><h3>{toolLabels[name]?.title || name}</h3><p>{toolLabels[name]?.description || '当前对话可调用。'}</p><code>{name}</code></div><span className="status-pill">已加载</span></article>)}</div>
             <div className="settings-note"><strong>当前文件访问范围</strong><p>教学工作区 · 只读 · 拒绝越界路径。当前工具集由本机启动配置固定，页面不会自动开放更多工具。</p></div>
           </>}
           {tab === 'memory' && <>

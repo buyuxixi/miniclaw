@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { readApi, searchSessions, writeApi } from './management-api';
 import type { ChatController } from './chat-controller';
 import type { ChatState, SessionRow } from './types';
+import { Icon } from './Icon';
 
 export function SidebarSessions({ controller, chat, onSelect }: { controller: ChatController; chat: ChatState; onSelect: () => void }) {
   const [query, setQuery] = useState('');
@@ -52,16 +53,16 @@ export function SidebarSessions({ controller, chat, onSelect }: { controller: Ch
     finally { setSaving(false); }
   }
   return <>
-    <label className="sidebar-search"><span>⌕</span><input aria-label="搜索对话" value={query} placeholder="搜索对话" onChange={event => { setQuery(event.target.value); setEditing(''); }} />{query && <button aria-label="清除搜索" onClick={() => setQuery('')}>×</button>}</label>
+    <label className="sidebar-search"><Icon name="search" size={17} /><input name="session-search" autoComplete="off" aria-label="搜索对话" value={query} placeholder="搜索对话" onChange={event => { setQuery(event.target.value); setEditing(''); }} />{query && <button aria-label="清除搜索" onClick={() => setQuery('')}><Icon name="close" size={14} /></button>}</label>
     <div className="section-label">{query ? '搜索结果' : '最近对话'}{loading && <span> · 查找中</span>}</div>
     <nav className="session-list" aria-label="历史对话">
       {error && <p className="sidebar-error" role="alert">{error}</p>}
       {rows.map(row => <div className={`session-row ${row.id === chat.storedId ? 'selected' : ''}`} key={row.id}>
         {editing === row.id ? <form className="rename-form" onSubmit={event => { event.preventDefault(); void rename(row); }}>
-          <input aria-label="对话名称" autoFocus maxLength={200} value={name} onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') setEditing(''); }} />
-          <button aria-label="保存对话名称" disabled={blocked || !name.trim()}>✓</button><button type="button" aria-label="取消改名" onClick={() => setEditing('')}>×</button>
+          <input name="session-title" autoComplete="off" aria-label="对话名称" autoFocus maxLength={200} value={name} onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') setEditing(''); }} />
+          <button aria-label="保存对话名称" disabled={blocked || !name.trim()}><Icon name="check" size={16} /></button><button type="button" aria-label="取消改名" onClick={() => setEditing('')}><Icon name="close" size={16} /></button>
         </form> : <><button className="session" title={row.title || row.preview} disabled={blocked} onClick={() => { void controller.open(row.id); onSelect(); }}><span>{row.title || row.preview || '未命名对话'}</span></button>
-          <button className="session-action" title="重命名" aria-label={`重命名 ${row.title || '未命名对话'}`} disabled={blocked} onClick={() => { setEditing(row.id); setName(row.title || ''); }}>✎</button></>}
+          <button className="session-action" title="重命名" aria-label={`重命名 ${row.title || '未命名对话'}`} disabled={blocked} onClick={() => { setEditing(row.id); setName(row.title || ''); }}><Icon name="edit" size={15} /></button></>}
       </div>)}
       {!loading && !rows.length && <p className="sessions-empty">{query ? '没有找到相关对话' : '开始聊天后，对话会保存在这里'}</p>}
       {!query && rows.length < total && <button className="load-sessions" disabled={loading} onClick={() => setLimit(value => value + 20)}>加载更早的对话</button>}
