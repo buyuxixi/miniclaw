@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { loadDraft, saveDraft } from './drafts';
-import { skillReadiness } from './skill-readiness';
+import { skillDetails, skillReadiness } from './skill-readiness';
 afterEach(() => vi.unstubAllGlobals());
 test('drafts remain separate across sessions and reload with selected attachment ids', () => {
   const store = new Map<string, string>();
@@ -19,4 +19,8 @@ test('a bound tool is still missing until this session actually loaded it', () =
   expect(skillReadiness(skill, ['miniclaw_read_file']).state).toBe('missing');
   expect(skillReadiness(skill, ['miniclaw_save_artifact']).state).toBe('ready');
   expect(skillReadiness({ ...skill, binding: { ...skill.binding, current: false } }, ['miniclaw_save_artifact']).state).toBe('unverified');
+});
+
+test('custom skill identifiers that match Object properties still display their own description', () => {
+  expect(skillDetails({ name: 'constructor', description: 'custom flow' })).toEqual({ title: 'constructor', description: 'custom flow' });
 });

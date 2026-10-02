@@ -20,7 +20,7 @@ export function SkillEditor({ name, controller, sessionId, blocked, onBack, onSa
   const installed = useRef(Boolean(name));
   const locked = blocked || loading || busy;
   useEffect(() => { onBusy(busy); }, [busy, onBusy]);
-  const dirty = text !== original || dirtyBinding || !installed.current;
+  const dirty = text !== original || dirtyBinding;
   useEffect(() => { onDirty(dirty); return () => onDirty(false); }, [dirty, onDirty]);
   useEffect(() => {
     const abort = new AbortController();

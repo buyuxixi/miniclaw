@@ -95,7 +95,7 @@ export function SettingsDialog({ controller, chat, onClose, initialTab = 'genera
               <div className="editor-footer"><span>保存后在新对话中应用</span><button className="primary-button" disabled={blocked || !memoryDirty} onClick={() => void action(async () => { await writeApi('/api/config', 'PUT', { config: { memory } }); setMemoryOriginal(JSON.stringify(memory)); setNotice('记忆设置已保存。新对话会按这些设置加载记忆。'); })}>保存设置</button></div>
             </>}
           </>}
-          {tab === 'memory' && <MemoryEditor blocked={chat.running || chat.busy || controller.connection !== 'open'} onBusy={setBusy} onDirty={setDirty} />}
+          {tab === 'memory' && <MemoryEditor sessionId={chat.sessionId} blocked={chat.running || chat.busy || controller.connection !== 'open'} onBusy={setBusy} onDirty={setDirty} />}
           {tab === 'developer' && <><p className="settings-description">用于学习和排查 Agent 的上下文加载、工具调用及用量。不会出现在普通聊天中。</p><button aria-expanded={diagnostics} onClick={() => setDiagnostics(v => !v)}>上下文诊断</button>{diagnostics && <ContextPanel controller={controller} chat={chat} />}</>}
         </div>
       </div>

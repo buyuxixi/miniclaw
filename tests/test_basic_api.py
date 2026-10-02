@@ -145,6 +145,25 @@ class BasicAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual((HOME / 'skills/basic-demo/SKILL.md').read_text(encoding='utf-8'), self.content)
 
+    def test_memory_status_reflects_agent_snapshot_and_flags_without_exposing_text(self):
+        before = CLIENT.get('/api/miniclaw/memory').json()
+        for target in ('memory', 'user'):
+            response = CLIENT.put('/api/miniclaw/memory', json={'target': target, 'text': 'fixture snapshot', 'hash': before[target]['hash']})
+            self.assertEqual(response.status_code, 200)
+        from tools.memory_tool_store import MemoryStore
+        memory_store = MemoryStore(); memory_store.load_from_disk()
+        self.session['agent']._memory_store = memory_store
+        self.session['agent']._memory_enabled = True
+        self.session['agent']._user_profile_enabled = False
+        with patch('agent.image_routing.decide_image_input_mode', return_value='text'):
+            state = CLIENT.get('/api/miniclaw/session-capabilities?session_id=test-live').json()
+        self.assertEqual(state['memory'], {'memory': {'enabled': True, 'loaded': True}, 'user': {'enabled': False, 'loaded': False}})
+        self.assertNotIn('fixture snapshot', json.dumps(state))
+        current = CLIENT.get('/api/miniclaw/memory').json()['memory']
+        CLIENT.put('/api/miniclaw/memory', json={'target': 'memory', 'text': 'changed fixture', 'hash': current['hash']})
+        self.assertIn('fixture snapshot', memory_store.format_for_system_prompt('memory'))
+        self.assertNotIn('changed fixture', memory_store.format_for_system_prompt('memory'))
+
     def test_artifacts_exclusive_and_confined(self):
         spec = importlib.util.spec_from_file_location('fixture_files', ROOT / 'plugins/miniclaw-files/__init__.py'); mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
         workspace = PROJECT / 'workspace'; workspace.mkdir(exist_ok=True)

@@ -14,7 +14,7 @@ const details: Record<string, { title: string; description: string }> = {
   'architecture-diagram': { title: '架构图', description: '将系统结构整理成图示。' },
 };
 export function skillDetails(skill: Pick<InstalledSkill, 'name' | 'description'>) {
-  return details[skill.name] ?? { title: skill.name, description: skill.description };
+  return Object.hasOwn(details, skill.name) ? details[skill.name] : { title: skill.name, description: skill.description };
 }
 // This is an explicit assessment of the pinned bundled flows, not a generic
 // dependency inference or security boundary. Unknown environments stay unknown.

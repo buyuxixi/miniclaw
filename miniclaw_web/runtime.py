@@ -248,7 +248,14 @@ def install(app, root):
         session, error = server._sess_nowait({'session_id': session_id}, None)
         if error:
             raise HTTPException(404, '运行会话不存在')
-        return {'ready': session.get('agent') is not None, 'images': native_images(session), 'reason': '当前模型未声明原生视觉能力，请配置视觉模型后新建对话。'}
+        agent = session.get('agent')
+        memory_store = getattr(agent, '_memory_store', None)
+        memory = {}
+        for target, flag in [('memory', '_memory_enabled'), ('user', '_user_profile_enabled')]:
+            enabled = bool(getattr(agent, flag, False))
+            block = memory_store.format_for_system_prompt(target) if memory_store and enabled else ''
+            memory[target] = {'enabled': enabled, 'loaded': bool(block)}
+        return {'ready': agent is not None, 'images': native_images(session), 'memory': memory, 'reason': '当前模型未声明原生视觉能力，请配置视觉模型后新建对话。'}
 
     class SubmitParams(Params):
         session_id: str
