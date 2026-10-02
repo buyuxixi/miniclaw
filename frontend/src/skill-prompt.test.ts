@@ -5,7 +5,7 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 function setup(enabled = true) {
   vi.stubGlobal('window', { __HERMES_SESSION_TOKEN__: 'test' });
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => [{ name: 'lesson', enabled }] }));
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => [{ name: 'lesson', enabled, binding: { current: true, required_tools: [], content_hash: 'fixture', version: 1 } }] }));
   const controller = new ChatController();
   controller.connection = 'open';
   controller.state.sessionId = 'live';
@@ -18,11 +18,11 @@ function setup(enabled = true) {
   return { controller, request };
 }
 
-test('loads full skill for the model while showing only the invocation in chat', async () => {
+test('submits the skill identity to server loading while showing only the invocation in chat', async () => {
   const { controller, request } = setup();
   expect(await controller.send('user task', 'lesson')).toBe(true);
-  expect(request).toHaveBeenLastCalledWith('prompt.submit', { session_id: 'live', text: 'FULL SKILL BODY\nuser task' });
-  expect(controller.state.items[0].text).toBe('/lesson user task');
+  expect(request).toHaveBeenLastCalledWith('miniclaw.turn.submit', { session_id: 'live', text: 'user task', skill: 'lesson', attachments: [] });
+  expect(controller.state.items[0].text).toBe('/lesson\nuser task');
 });
 
 test('revoked skill fails before dispatch or model submission and keeps the transcript', async () => {
@@ -49,7 +49,7 @@ test('stop during skill loading prevents delayed prompt submission', async () =>
   await controller.stop();
   finish({ skills: { '/lesson': {} }, categories: [] });
   expect(await sent).toBe(false);
-  expect(request.mock.calls.map(call => call[0])).not.toContain('prompt.submit');
+  expect(request.mock.calls.map(call => call[0])).not.toContain('miniclaw.turn.submit');
   expect(controller.state.items).toEqual([]);
 });
 
@@ -61,4 +61,13 @@ test('PDF flow without terminal is rejected before skill dispatch or model submi
   expect(request).not.toHaveBeenCalled();
   expect(controller.state.items).toEqual([]);
   expect(controller.state.error).toContain('需要终端');
+});
+
+test('a definitive server refusal removes the optimistic bubble and preserves its reason', async () => {
+  const { controller, request } = setup();
+  request.mockRejectedValue(Object.assign(new Error('附件不属于此会话'), { code: 4200 }));
+  expect(await controller.send('user task')).toBe(false);
+  expect(controller.state.items).toEqual([]);
+  expect(controller.state.error).toContain('不属于');
+  expect(request).toHaveBeenCalledTimes(1);
 });

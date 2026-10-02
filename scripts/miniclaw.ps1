@@ -41,6 +41,8 @@ try {
     } elseif ($Action -eq 'test') {
         & $pythonPath (Join-Path $PSScriptRoot 'verify_offline.py')
         if ($LASTEXITCODE -ne 0) { throw 'Offline checks failed' }
+        & $pythonPath (Join-Path $projectRoot 'tests\test_basic_api.py')
+        if ($LASTEXITCODE -ne 0) { throw 'Basic API checks failed' }
         Set-Location (Join-Path $projectRoot 'frontend')
         & $runtimeConfig.node $runtimeConfig.npm_cli test
     } else {
@@ -58,7 +60,7 @@ try {
             } else {
                 Remove-Item Env:HERMES_WEB_DIST -ErrorAction SilentlyContinue
             }
-            & $pythonPath -m hermes_cli.main dashboard --host 127.0.0.1 --port $Port --no-open --skip-build --isolated
+            & $pythonPath (Join-Path $projectRoot 'scripts\web_entry.py') dashboard --host 127.0.0.1 --port $Port --no-open --skip-build --isolated
         }
     }
     if ($LASTEXITCODE -ne 0) { throw "miniclaw $Action failed with exit code $LASTEXITCODE" }

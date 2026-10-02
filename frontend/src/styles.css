@@ -16,6 +16,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .new-chat:hover { background: #fff; border-color: #bbbcb5; }
 .new-chat span { font-size: 20px; line-height: 18px; }
 .section-label { font-size: 11px; color: #718096; padding: 0 12px 10px; }
+.session-scope { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
+.session-scope button { margin-left: auto; border: 0; padding: 3px 0; color: var(--secondary); background: transparent; font-size: 11px; }
+.session-scope button:hover { color: var(--accent); }
 .session-list { overflow: auto; flex: 1; }
 .session { width: 100%; display: flex; gap: 9px; align-items: center; border: 0; background: transparent; text-align: left; border-radius: 7px; padding: 10px 12px; color: var(--secondary); font-size: 12px; margin-bottom: 3px; }
 .session > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -363,3 +366,33 @@ svg { flex-shrink: 0; vertical-align: middle; }
   .picker-footer { padding: 14px 18px max(14px, env(safe-area-inset-bottom)); gap: 12px; }
   .picker-footer p { max-width: 170px; }
 }
+.attachments { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 0; min-width: 0; }
+.attachment-card { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 1px solid #dde3ec; border-radius: 12px; background: #f8fafc; max-width: 260px; min-width: 0; font-size: 12px; }
+.attachment-card > div { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.attachment-card strong { max-width: 170px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+.attachment-card small { color: #657084; }
+.attachment-card img { display: block; width: 46px; height: 46px; object-fit: cover; border-radius: 6px; }
+.attachment-card a { color: #315dad; }
+.upload-status { font-size: 12px; color: #67778f; padding: 0 12px; }
+.jump-latest { display: block; margin: 0 auto 10px; border: 1px solid #d8e1ef; background: white; color: #365d96; border-radius: 20px; padding: 7px 14px; box-shadow: 0 3px 12px #182c4c0a; }
+.settings-intro-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.editor-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; font-size: 12px; color: #66758b; }
+.field-label { display: flex; flex-direction: column; gap: 7px; font-size: 13px; margin-top: 16px; }
+.field-label input { border: 1px solid #d8e0eb; border-radius: 8px; padding: 9px 12px; font: inherit; }
+.tool-binding { border: 1px solid #e0e6ef; border-radius: 12px; padding: 15px; margin-top: 18px; min-width: 0; }
+.tool-binding legend { font-weight: 600; font-size: 14px; padding: 0 7px; }
+.tool-binding p { color: #6c798c; font-size: 13px; line-height: 1.7; }
+.tool-binding label { display: flex; gap: 9px; align-items: start; margin: 10px 0; font-size: 13px; overflow-wrap: anywhere; }
+.tool-binding code { white-space: normal; word-break: break-all; }
+.tool-binding input { accent-color: #3464a9; margin-top: 3px; }
+.binding-confirm { border-top: 1px solid #e0e6ef; padding-top: 13px; }
+.tool-state { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 9px; font-size: 12px; }
+.tool-state code { overflow-wrap: anywhere; word-break: break-all; }
+.memory-editor { border-top: 1px solid #e5e9ef; padding-top: 20px; margin-top: 20px; }
+.memory-editor textarea { width: 100%; min-height: 160px; resize: vertical; box-sizing: border-box; margin-top: 12px; padding: 12px; border: 1px solid #d8e0eb; border-radius: 10px; font: inherit; font-size: 14px; line-height: 1.7; }
+@media (max-width: 650px) { .composer-options { gap: 6px; flex-wrap: wrap; } .composer-toolbar { gap: 8px; } .model-badge { max-width: 120px; overflow: hidden; text-overflow: ellipsis; } .attachment-card { max-width: 100%; } .settings-intro { flex-wrap: wrap; } }
+.confirm-scrim { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: 18px; background: rgb(17 24 39 / 25%); }
+.confirm-card { max-width: 380px; padding: 24px; border-radius: 16px; background: white; box-shadow: 0 16px 48px rgb(17 24 39 / 18%); }
+.confirm-card h3 { margin: 0 0 12px; }
+.confirm-card p { color: var(--muted); line-height: 1.7; }
+.confirm-card div { display: flex; gap: 10px; flex-wrap: wrap; }

@@ -1,4 +1,5 @@
-export interface InstalledSkill { name: string; description: string; category?: string; enabled: boolean }
+export interface SkillBinding { version: number; required_tools: string[]; content_hash: string; current: boolean }
+export interface InstalledSkill { name: string; description: string; category?: string; enabled: boolean; binding?: SkillBinding | null }
 export interface SkillReadiness { state: 'ready' | 'missing' | 'unverified' | 'disabled'; label: string; reason: string }
 const documentSkills = new Set(['pdf', 'docx', 'xlsx', 'powerpoint']);
 const details: Record<string, { title: string; description: string }> = {
@@ -17,9 +18,14 @@ export function skillDetails(skill: Pick<InstalledSkill, 'name' | 'description'>
 }
 // This is an explicit assessment of the pinned bundled flows, not a generic
 // dependency inference or security boundary. Unknown environments stay unknown.
-export function skillReadiness(skill: Pick<InstalledSkill, 'name' | 'enabled'>, tools: string[]): SkillReadiness {
+export function skillReadiness(skill: Pick<InstalledSkill, 'name' | 'enabled' | 'binding'>, tools: string[]): SkillReadiness {
   if (!skill.enabled) return { state: 'disabled', label: '未启用', reason: '可在技能管理中启用，再检查执行条件。' };
-  if (skill.name === 'humanizer') return { state: 'ready', label: '当前可用', reason: '已核对的文本改写流程，不依赖执行工具。' };
+  if (skill.binding) {
+    if (!skill.binding.current) return { state: 'unverified', label: '正文已变化', reason: '请重新核对技能流程的工具依赖。' };
+    const missing = skill.binding.required_tools.filter(t => !tools.includes(t));
+    if (missing.length) return { state: 'missing', label: '缺少工具', reason: `当前对话缺少：${missing.join('、')}。绑定不会自动开放权限。` };
+    return { state: 'ready', label: '当前可用', reason: skill.binding.required_tools.length ? '已声明的工具均已加载；运行依赖仍由技能维护者负责。' : '已声明为文本流程，不依赖执行工具。' };
+  }
   if (documentSkills.has(skill.name) && !tools.includes('terminal')) return { state: 'missing', label: '缺少执行工具', reason: '需要终端运行文档脚本，当前对话未开放。' };
   return { state: 'unverified', label: '运行条件待核对', reason: '已安装流程，所需工具和运行环境尚未验证。' };
 }

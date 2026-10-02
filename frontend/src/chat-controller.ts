@@ -3,6 +3,8 @@ import { assistantText, finishItems, historyItems, resultFailed, storedSessionId
 import { storedToolRows } from './history-api';
 import { prepareSkillPrompt } from './skill-prompt';
 import type { ChatState, HistoryRow, SessionRow, SessionSnapshot } from './types';
+import type { Attachment, TurnDisplay } from './attachments';
+import { readApi } from './management-api';
 
 const blank = (): ChatState => ({
   sessions: [], sessionId: '', storedId: '', items: [], info: {},
@@ -49,7 +51,16 @@ export class ChatController {
       const saved = this.state.storedId || localStorage.getItem('miniclaw.selected');
       // A selected older session can be outside the recent sidebar window.
       // Resume by its durable id rather than silently replacing it on reload.
-      if (saved) await this.open(saved, true);
+      if (saved) {
+        await this.open(saved, true);
+        if (!this.state.sessionId && this.state.error === 'session not found') {
+          // Empty sessions may have a provisional id but no durable row after
+          // a restart. Keep their draft when creating the replacement.
+          const draft = localStorage.getItem(`miniclaw.draft.${saved}`);
+          this.patch({ busy: false }); await this.newSession(draft ?? undefined);
+          this.patch({ error: '之前的会话已不可用。已新建对话，文字草稿已保留；旧附件请重新上传。' });
+        }
+      }
       else { this.patch({ busy: false }); await this.newSession(); }
     } catch (error) { this.fail(error); }
   }
@@ -72,7 +83,7 @@ export class ChatController {
     });
   }
 
-  async newSession() {
+  async newSession(recoveredDraft?: string) {
     if (this.state.running || this.state.busy) return;
     const generation = ++this.selection;
     this.patch({ busy: true, error: '', status: '' });
@@ -80,7 +91,17 @@ export class ChatController {
       const snapshot = await this.client.request<SessionSnapshot>('session.create', {
         source: 'desktop', follow_profile_config: true,
       });
-      if (!this.disposed && generation === this.selection) this.applySnapshot(snapshot);
+      if (!this.disposed && generation === this.selection) {
+        if (recoveredDraft) {
+          // Copy before notifying React, so Composer cannot overwrite it with
+          // its initial blank state. Attachment ownership remains the old id.
+          try {
+            const value = JSON.parse(recoveredDraft);
+            localStorage.setItem(`miniclaw.draft.${storedSessionId(snapshot)}`, JSON.stringify({ ...value, attachments: [] }));
+          } catch { /* malformed local draft */ }
+        }
+        this.applySnapshot(snapshot);
+      }
     } catch (error) { this.fail(error); }
   }
 
@@ -99,8 +120,8 @@ export class ChatController {
     } catch (error) { if (generation === this.selection) this.fail(error); }
   }
 
-  async send(text: string, skill?: string): Promise<boolean> {
-    if (!text.trim() || this.state.running || this.state.busy || !this.state.sessionId || this.connection !== 'open') return false;
+  async send(text: string, skill?: string, attachments: Attachment[] = []): Promise<boolean> {
+    if ((!text.trim() && !attachments.length) || this.state.running || this.state.busy || !this.state.sessionId || this.connection !== 'open') return false;
     const previous = this.state.items;
     const sessionId = this.state.sessionId;
     const turn = ++this.turn;
@@ -111,9 +132,11 @@ export class ChatController {
       const prompt = skill ? await prepareSkillPrompt(this.client, sessionId, skill, text, () => turn === this.turn && sessionId === this.state.sessionId, Object.values(this.state.info.tools ?? {}).flat()) : { text, display: text };
       if (turn !== this.turn || !this.state.running || this.connection !== 'open' || sessionId !== this.state.sessionId) return false;
       this.preparingSkill = false;
-      this.patch({ items: [...previous, { id: crypto.randomUUID(), kind: 'user', text: prompt.display }], status: '正在提交' });
+      this.patch({ items: [...previous, { id: crypto.randomUUID(), kind: 'user', text: prompt.display, attachments }], status: '正在提交' });
       submitted = true;
-      await this.client.request('prompt.submit', { session_id: sessionId, text: prompt.text });
+      const accepted = await this.client.request<{ warning?: string }>('miniclaw.turn.submit', { session_id: sessionId, text, skill, attachments: attachments.map(a => a.id) });
+      if (accepted.warning) this.patch({ error: accepted.warning });
+      if (!this.state.running) await this.reconcile(sessionId, this.selection);
       return true;
     } catch (error) {
       if (turn !== this.turn || sessionId !== this.state.sessionId) return false;
@@ -121,7 +144,9 @@ export class ChatController {
       // the local text and recover server state; never automatically resend it.
       this.patch({ running: false, status: '' });
       this.fail(error);
-      if (submitted && this.connection === 'open') await this.open(this.state.storedId);
+      const code = typeof error === 'object' && error ? (error as { code?: number }).code : undefined;
+      if (code === 4200 || code === 4000) this.patch({ items: previous });
+      else if (submitted && this.connection === 'open') await this.open(this.state.storedId);
       return false;
     } finally { if (turn === this.turn) this.preparingSkill = false; }
   }
@@ -201,7 +226,13 @@ export class ChatController {
       // persisted message. Fetch durable tool bodies only when replay has tools.
       const toolRows = result.messages.some(row => row.role === 'tool') ? await storedToolRows(storedId) : [];
       if (this.disposed || generation !== this.selection || turn !== this.turn || this.state.running) return;
-      this.patch({ items: historyItems(withToolResults(result.messages, toolRows)) });
+      const displays = result.messages.some(row => row.role === 'user') ? await readApi<Record<string, TurnDisplay>>(`/api/miniclaw/turns?owner=${encodeURIComponent(storedId)}`) : {};
+      if (this.disposed || generation !== this.selection || turn !== this.turn || this.state.running) return;
+      const items = historyItems(withToolResults(result.messages, toolRows)).map(item => {
+        const display = displays[item.id.replace('row-', '')];
+        return item.kind === 'user' && display ? { ...item, text: display.text, attachments: display.attachments } : item;
+      });
+      this.patch({ items });
       await this.refresh();
     } catch (error) {
       if (generation === this.selection && turn === this.turn) this.fail(error);

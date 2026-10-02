@@ -35,3 +35,14 @@ test('reload resumes the durable selection even outside the recent list window',
   expect(resume).toHaveBeenCalledWith('older-than-sidebar', true);
   expect(create).not.toHaveBeenCalled();
 });
+
+test('an orphan draft is copied before the replacement session is rendered, without transferring attachment ownership', async () => {
+  const values = new Map<string, string>();
+  vi.stubGlobal('localStorage', { getItem: (key: string) => values.get(key), setItem: (key: string, value: string) => values.set(key, value) });
+  const controller = new ChatController();
+  vi.spyOn(controller.client, 'request').mockResolvedValue({ session_id: 'live', stored_session_id: 'replacement', info: {}, messages: [] });
+  let draftAtRender = '';
+  controller.subscribe(() => { if (controller.state.storedId === 'replacement') draftAtRender = values.get('miniclaw.draft.replacement') ?? ''; });
+  await controller.newSession(JSON.stringify({ text: 'unfinished', skill: 'lesson', attachments: [{ id: 'belongs-to-old' }] }));
+  expect(JSON.parse(draftAtRender)).toEqual({ text: 'unfinished', skill: 'lesson', attachments: [] });
+});

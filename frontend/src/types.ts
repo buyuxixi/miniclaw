@@ -1,3 +1,4 @@
+import type { Attachment } from './attachments';
 export interface HistoryRow {
   role: string;
   text?: string | null;
@@ -18,6 +19,7 @@ export interface ChatItem {
   args?: unknown;
   result?: unknown;
   status?: 'running' | 'done' | 'error' | 'interrupted' | 'unavailable';
+  attachments?: Attachment[];
 }
 
 export interface SessionRow {
@@ -25,6 +27,7 @@ export interface SessionRow {
   title: string;
   preview: string;
   message_count: number;
+  archived?: boolean;
 }
 
 export interface SessionInfo {

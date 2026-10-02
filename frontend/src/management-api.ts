@@ -21,10 +21,10 @@ export async function writeApi<T>(path: string, method: 'PUT' | 'POST' | 'PATCH'
   return response.json() as Promise<T>;
 }
 
-export async function searchSessions(query: string, signal: AbortSignal): Promise<SessionRow[]> {
-  const params = `exclude_sources=cron,delegate,kanban`;
+export async function searchSessions(query: string, signal: AbortSignal, archived = false): Promise<SessionRow[]> {
+  const params = `exclude_sources=cron,delegate,kanban&archived=${archived ? 'only' : 'exclude'}`;
   const body = await readApi<{ results: SessionRow[] }>(`/api/sessions/search?q=${encodeURIComponent(query)}&limit=100&${params}`, signal);
-  const found = new Map(body.results.map(row => [row.id, row]));
+  const found = new Map(body.results.filter(row => Boolean(row.archived) === archived).map(row => [row.id, row]));
   // The upstream FTS endpoint searches messages and ids, not titles. Page
   // compact session metadata so title lookup also covers older sessions.
   for (let offset = 0; !signal.aborted; offset += 100) {

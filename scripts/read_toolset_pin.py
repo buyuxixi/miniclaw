@@ -20,6 +20,8 @@ os.environ['HERMES_HOME'] = str(ROOT / '.hermes')
 def main() -> None:
     raw = yaml.safe_load((ROOT / '.hermes' / 'config.yaml').read_text(encoding='utf-8'))
     selection = (raw.get('platform_toolsets') or {}).get('cli')
+    if isinstance(selection, list) and 'miniclaw-skills' in selection and (raw.get('skills') or {}).get('inline_shell'):
+        raise ValueError('miniclaw-skills requires skills.inline_shell=false; refusing implicit shell execution')
     if not isinstance(selection, list) or not selection or any(
         not isinstance(name, str) or not re.fullmatch(r'[\w.:-]+', name) or name == 'all'
         for name in selection

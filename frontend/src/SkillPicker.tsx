@@ -23,7 +23,7 @@ export function SkillPicker({ controller, chat, selected, onClose, onChoose, onM
   useEffect(() => {
     const abort = new AbortController();
     setLoading(true); setError('');
-    void Promise.all([readApi<InstalledSkill[]>('/api/skills', abort.signal), controller.client.request<CommandCatalog>('commands.catalog', { session_id: chat.sessionId })])
+    void Promise.all([readApi<InstalledSkill[]>('/api/miniclaw/skills', abort.signal), controller.client.request<CommandCatalog>('commands.catalog', { session_id: chat.sessionId })])
       .then(([installed, commands]) => { if (!abort.signal.aborted) { setSkills(installed); setCatalog(commands); } })
       .catch(reason => { if (!abort.signal.aborted) setError(String(reason)); })
       .finally(() => { if (!abort.signal.aborted) setLoading(false); });

@@ -1,9 +1,10 @@
 name: miniclaw-files
-version: 0.1.0
-description: Bounded read-only text tools for miniclaw's first learning stage.
+version: 0.2.0
+description: Bounded text readers and optional exclusive text artifact creation for miniclaw.
 provides_tools:
   - miniclaw_read_file
   - miniclaw_list_files
+  - miniclaw_save_artifact
 config_schema:
   workspace:
     type: str
