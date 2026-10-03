@@ -3,6 +3,7 @@ export interface InstalledSkill { name: string; description: string; category?: 
 export interface SkillReadiness { state: 'ready' | 'missing' | 'unverified' | 'disabled'; label: string; reason: string }
 const documentSkills = new Set(['pdf', 'docx', 'xlsx', 'powerpoint']);
 const details: Record<string, { title: string; description: string }> = {
+  'product-image-edit': { title: '商品修图', description: '编辑本对话的图片，保留原图和结果版本，可对比后继续修改。' },
   humanizer: { title: '自然表达', description: '让文案更自然，减少生硬和模板化的表达。' },
   pdf: { title: 'PDF 文档', description: '生成、提取和整理 PDF 文档。' },
   docx: { title: 'Word 文档', description: '创建、编辑和审阅 Word 文档。' },

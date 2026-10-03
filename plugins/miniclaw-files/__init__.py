@@ -90,6 +90,24 @@ def register(ctx):
             'type': 'object', 'properties': {'name': {'type': 'string'}, 'content': {'type': 'string'}},
             'required': ['name', 'content'], 'additionalProperties': False,
         }}, handler=lambda args, **kwargs: _save_artifact(ctx, args))
+    register_images(ctx)
+
+
+def register_images(ctx):
+    definitions = [
+        ('miniclaw_image_list', 'List image IDs and edit versions owned by this conversation. Use these IDs, never invent a path or URL.', {}, []),
+        ('miniclaw_image_status', 'Read or briefly await an image job. Only succeeded with output means an image was produced. Do not automatically repeat an uncertain paid AI request.', {'job_id': {'type': 'string'}}, ['job_id']),
+        ('miniclaw_edit_image', 'Edit one owned image, preserving the source. Operations: adjust (brightness/contrast/saturation/sharpness -1..1); crop (ratio 1:1,4:3,3:4,16:9,9:16 or pixel rect x,y,width,height); rotate (angle multiples of 90); flip (direction horizontal/vertical); resize (width,height 32..4096); ai_edit (prompt, uses paid DashScope). Choose a unique request_id, reuse only for the exact same uncertain request. A queued/running response is not a completed image.',
+         {'source_id': {'type': 'string'}, 'operation': {'type': 'string', 'enum': ['adjust', 'crop', 'rotate', 'flip', 'resize', 'ai_edit']},
+          'params': {'type': 'object', 'description': 'Parameters for the selected operation; validated server-side.'}, 'request_id': {'type': 'string', 'minLength': 8, 'maxLength': 80}},
+         ['source_id', 'operation', 'params', 'request_id']),
+    ]
+    for name, description, properties, required in definitions:
+        def handler(args, session_id=None, _name=name, **kwargs):
+            from miniclaw_web.images import image_tool
+            return image_tool(_name, args, session_id)
+        ctx.register_tool(name=name, toolset='miniclaw-images', description=description,
+            schema={'name': name, 'description': description, 'parameters': {'type': 'object', 'properties': properties, 'required': required, 'additionalProperties': False}}, handler=handler)
 
 
 def _save_artifact(ctx, args):

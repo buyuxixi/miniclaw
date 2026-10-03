@@ -7,3 +7,5 @@ miniclaw 前端直接引用该 submodule 中的共享 JSON-RPC 客户端；Agent
 前端依赖及精确版本见 `frontend/package.json` 和 `frontend/package-lock.json`；Python 依赖与许可信息由上游 `pyproject.toml`、`uv.lock` 和对应包提供。
 
 根目录 miniclaw 自有代码的许可尚未选定，本版不新增根 LICENSE。
+
+图片编辑接入参考了 [yuyuanweb/ai-picture-editor](https://github.com/yuyuanweb/ai-picture-editor) 的功能与 Provider 结构（审阅提交 `49f6ad8c96740a68b7e6228a47e8e2be6876eb34`）。本仓库未复制其应用源码；图片工作区、执行器、工具和百炼适配为独立实现，使用既有 Pillow/httpx 依赖和公开 API。

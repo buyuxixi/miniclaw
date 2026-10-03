@@ -102,6 +102,46 @@ class BasicAPI(unittest.TestCase):
             self.assertNotIn('error', self.submit(attachments=[identifier]))
         self.assertEqual(len(self.session['attached_images']), 1)
 
+    def test_nonvisual_model_can_use_owned_image_ids_only_with_edit_tool(self):
+        buffer = io.BytesIO(); Image.new('RGB', (2, 2), 'blue').save(buffer, 'PNG')
+        identifier = self.attach('image.png', buffer.getvalue()).json()['id']
+        self.session['agent'].tools = [{'function': {'name': 'miniclaw_edit_image'}}]
+        seen = {}
+        def accept(rid, params):
+            seen.update(params)
+            return server._ok(rid, {'status': 'streaming', 'user_row_id': 78})
+        with patch('agent.image_routing.decide_image_input_mode', return_value='text'), patch.dict(server._methods, {'prompt.submit': accept}):
+            self.assertNotIn('error', self.submit(attachments=[identifier]))
+        self.assertEqual(self.session['attached_images'], [])
+        self.assertIn(identifier, seen['text']); self.assertIn('不能直接看图', seen['text'])
+        self.assertNotIn(str(HOME), seen['text'])
+
+    def test_image_job_api_checks_actual_schema_owner_and_fields(self):
+        buffer = io.BytesIO(); Image.new('RGB', (64, 32), 'blue').save(buffer, 'PNG')
+        own = self.attach('image.png', buffer.getvalue()).json()['id']
+        foreign = self.attach('image.png', buffer.getvalue(), owner='other').json()['id']
+        params = dict(session_id='test-live', source_id=own, operation='rotate', params={'angle': 90}, request_id='api-fixture-image')
+        self.assertEqual(CLIENT.post('/api/miniclaw/image-jobs', json=params).status_code, 403)
+        self.session['agent'].tools = [{'function': {'name': 'miniclaw_edit_image'}}]
+        self.assertEqual(CLIENT.post('/api/miniclaw/image-jobs', json={**params, 'source_id': foreign}).status_code, 400)
+        self.assertEqual(CLIENT.post('/api/miniclaw/image-jobs', json={**params, 'owner': 'other'}).status_code, 400)
+        self.assertEqual(CLIENT.post('/api/miniclaw/image-jobs', json={**params, 'session_id': []}).status_code, 400)
+        accepted = CLIENT.post('/api/miniclaw/image-jobs', json=params)
+        self.assertEqual(accepted.status_code, 200, accepted.text)
+        identifier = accepted.json()['id']
+        self.assertEqual(CLIENT.get(f'/api/miniclaw/image-jobs/{identifier}?owner=other').status_code, 404)
+        self.assertEqual(CLIENT.get(f'/api/miniclaw/image-jobs/{identifier}?owner=owner-one').status_code, 200)
+        self.assertNotIn('path', accepted.json()['source'])
+        self.assertIsNotNone(server._get_db().get_session('owner-one'))
+
+    def test_manual_image_edit_does_not_start_if_native_session_cannot_persist(self):
+        buffer = io.BytesIO(); Image.new('RGB', (64, 32), 'blue').save(buffer, 'PNG')
+        own = self.attach('image.png', buffer.getvalue()).json()['id']
+        self.session['agent'].tools = [{'function': {'name': 'miniclaw_edit_image'}}]
+        payload = dict(session_id='test-live', source_id=own, operation='rotate', params={'angle': 90}, request_id='storage-failed-request')
+        with patch.object(server, '_ensure_session_db_row', return_value=False):
+            self.assertEqual(CLIENT.post('/api/miniclaw/image-jobs', json=payload).status_code, 503)
+
     def test_binding_does_not_authorize_tools_and_content_changes_invalidate_it(self):
         self.assertEqual(self.declare(['terminal']).status_code, 200)
         self.assertIn('缺少工具', self.submit(skill='basic-demo')['error']['message'])
@@ -203,6 +243,7 @@ if __name__ == '__main__':
     try:
         result = unittest.main(exit=False).result
     finally:
+        server._sessions.clear()
         from hermes_state_registry import close_all_under
         close_all_under(HOME)
         FIXTURE.cleanup()

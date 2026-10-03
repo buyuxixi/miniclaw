@@ -1,10 +1,13 @@
 name: miniclaw-files
-version: 0.2.0
+version: 0.3.0
 description: Bounded text readers and optional exclusive text artifact creation for miniclaw.
 provides_tools:
   - miniclaw_read_file
   - miniclaw_list_files
   - miniclaw_save_artifact
+  - miniclaw_image_list
+  - miniclaw_edit_image
+  - miniclaw_image_status
 config_schema:
   workspace:
     type: str

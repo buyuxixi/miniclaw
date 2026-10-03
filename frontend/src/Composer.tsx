@@ -4,12 +4,12 @@ import type { ChatState } from './types';
 import { SkillPicker } from './SkillPicker';
 import { Icon } from './Icon';
 import { skillDetails } from './skill-readiness';
-import { uploadFile } from './attachments';
+import { uploadFile, type Attachment } from './attachments';
 import { AttachmentCard } from './AttachmentCard';
 import { loadDraft, saveDraft } from './drafts';
 import { readApi } from './management-api';
 
-export function Composer({ controller, chat, suggestion, onManage }: { controller: ChatController; chat: ChatState; suggestion?: { text: string; nonce: number }; onManage: () => void }) {
+export function Composer({ controller, chat, suggestion, onManage }: { controller: ChatController; chat: ChatState; suggestion?: { text: string; nonce: number; attachment?: Attachment }; onManage: () => void }) {
   const [draft, setDraft] = useState(() => loadDraft(chat.storedId));
   const [picker, setPicker] = useState(false);
   const [sending, setSending] = useState(false);
@@ -17,6 +17,7 @@ export function Composer({ controller, chat, suggestion, onManage }: { controlle
   const [error, setError] = useState('');
   const [vision, setVision] = useState(false);
   const [ready, setReady] = useState(false);
+  const editImages = Object.values(chat.info.tools ?? {}).flat().includes('miniclaw_edit_image');
   const input = useRef<HTMLTextAreaElement>(null);
   const file = useRef<HTMLInputElement>(null);
   const mounted = useRef(true);
@@ -24,7 +25,10 @@ export function Composer({ controller, chat, suggestion, onManage }: { controlle
   const blocked = controller.connection !== 'open' || chat.busy || chat.running || sending || uploading;
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => { if (!saveDraft(chat.storedId, draft)) setError('浏览器存储已满，草稿暂时无法保存；请保留页面。'); }, [draft, chat.storedId]);
-  useEffect(() => { if (suggestion) { setDraft(v => ({ ...v, text: suggestion.text })); input.current?.focus(); } }, [suggestion]);
+  useEffect(() => { if (suggestion) {
+    if (suggestion.attachment && draftRef.current.attachments.length >= 4 && !draftRef.current.attachments.some(a => a.id === suggestion.attachment!.id)) { setError('输入框已有4个附件，请先移除一项后再添加修图结果。'); return; }
+    setDraft(v => ({ ...v, text: suggestion.text || (suggestion.attachment ? v.text : ''), attachments: suggestion.attachment && !v.attachments.some(a => a.id === suggestion.attachment!.id) ? [...v.attachments, suggestion.attachment] : v.attachments })); input.current?.focus();
+  } }, [suggestion]);
   useEffect(() => { if (input.current) { input.current.style.height = 'auto'; input.current.style.height = `${Math.min(input.current.scrollHeight, 180)}px`; } }, [draft.text]);
   useEffect(() => {
     const abort = new AbortController();
@@ -53,7 +57,7 @@ export function Composer({ controller, chat, suggestion, onManage }: { controlle
   async function submit() {
     if (blocked || (!draft.text.trim() && !draft.attachments.length)) return;
     if (!ready && (draft.skill || draft.attachments.length)) { setError('会话正在初始化，技能与附件暂未就绪，请稍候再发送。草稿已保留。'); return; }
-    if (!vision && draft.attachments.some(a => a.kind === 'image')) { setError('当前模型不支持原生看图。可先移除图片发送文本；配置视觉模型后再使用图片。'); return; }
+    if (!vision && !editImages && draft.attachments.some(a => a.kind === 'image')) { setError('当前模型不支持原生看图。可先移除图片发送文本；配置视觉模型或修图工具后再使用图片。'); return; }
     const sent = draft; setSending(true); setError('');
     const accepted = await controller.send(sent.text, sent.skill, sent.attachments);
     if (mounted.current) { if (accepted) setDraft(v => ({ text: v.text === sent.text ? '' : v.text, attachments: v.attachments.filter(a => !sent.attachments.some(s => s.id === a.id)), skill: undefined })); setSending(false); input.current?.focus(); }
@@ -72,7 +76,7 @@ export function Composer({ controller, chat, suggestion, onManage }: { controlle
         <button className="skill-picker" type="button" disabled={blocked} onClick={() => setPicker(true)}><Icon name="skills" size={16} />选择技能<Icon name="chevron" size={14} /></button></div>
         {chat.running ? <button type="button" className="send-button stop" aria-label="停止" onClick={() => void controller.stop()}><Icon name="stop" size={15} /></button> : <button type="submit" className="send-button" aria-label="发送" disabled={blocked || (!draft.text.trim() && !draft.attachments.length)}><Icon name="arrow" size={20} /></button>}
       </div>{uploading && <p className="upload-status" role="status">正在上传…</p>}
-      {!vision && draft.attachments.some(a => a.kind === 'image') && <p className="upload-status">图片可预览，当前模型尚未支持看图。</p>}
+      {!vision && draft.attachments.some(a => a.kind === 'image') && <p className="upload-status">{editImages ? '当前模型通过图片ID调用修图工具，不直接读取画面。' : '图片可预览，当前模型尚未支持看图。'}</p>}
     </form>
     <div className="composer-hint">Enter 发送 · Shift + Enter 换行<span>草稿自动保存在本机</span></div>
     {picker && <SkillPicker controller={controller} chat={chat} selected={draft.skill} onClose={() => { setPicker(false); input.current?.focus(); }} onChoose={name => { setDraft(v => ({ ...v, skill: name })); setPicker(false); requestAnimationFrame(() => input.current?.focus()); }} onManage={() => { setPicker(false); onManage(); }} />}

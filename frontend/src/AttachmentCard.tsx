@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { attachmentBlob, type Attachment } from './attachments';
 import { Icon } from './Icon';
-export function AttachmentCard({ attachment, owner, onRemove }: { attachment: Attachment; owner: string; onRemove?: () => void }) {
+export function AttachmentCard({ attachment, owner, onRemove, onEdit }: { attachment: Attachment; owner: string; onRemove?: () => void; onEdit?: () => void }) {
   const [url, setUrl] = useState('');
   const [error, setError] = useState('');
   useEffect(() => {
@@ -12,6 +12,7 @@ export function AttachmentCard({ attachment, owner, onRemove }: { attachment: At
   }, [attachment.id, owner]);
   return <div className="attachment-card">{attachment.kind === 'image' && url ? <a href={url} target="_blank" rel="noreferrer" aria-label={`预览 ${attachment.name}`}><img src={url} alt={attachment.name} /></a> : <Icon name="file" size={22} />}
     <div><strong title={attachment.name}>{attachment.name}</strong><small>{error || `${(attachment.bytes / 1024).toFixed(1)} KiB`}</small>{url && attachment.kind === 'text' && <a href={url} download={attachment.name}>下载原文</a>}</div>
+    {attachment.kind === 'image' && onEdit && <button type="button" className="icon-button" aria-label={`编辑 ${attachment.name}`} onClick={onEdit}><Icon name="edit" size={14} /></button>}
     {onRemove && <button type="button" className="icon-button" aria-label={`移除 ${attachment.name}`} onClick={onRemove}><Icon name="close" size={14} /></button>}
   </div>;
 }

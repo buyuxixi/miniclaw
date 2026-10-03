@@ -16,6 +16,7 @@ $env:PATH = (Split-Path -Parent $runtimeConfig.node) + ';' + (Join-Path $project
 $env:HERMES_HOME = Join-Path $projectRoot '.hermes'
 $env:HERMES_PYTHON = $pythonPath
 $env:PYTHONUTF8 = '1'
+$env:PYTHONPATH = $projectRoot + $(if ($env:PYTHONPATH) { ';' + $env:PYTHONPATH } else { '' })
 if ($Port -eq 0) { $Port = if ($Action -eq 'dashboard') { 9119 } else { 9120 } }
 Push-Location $sourceRoot
 try {
@@ -43,6 +44,8 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Offline checks failed' }
         & $pythonPath (Join-Path $projectRoot 'tests\test_basic_api.py')
         if ($LASTEXITCODE -ne 0) { throw 'Basic API checks failed' }
+        & $pythonPath (Join-Path $projectRoot 'tests\test_images.py')
+        if ($LASTEXITCODE -ne 0) { throw 'Image editing checks failed' }
         Set-Location (Join-Path $projectRoot 'frontend')
         & $runtimeConfig.node $runtimeConfig.npm_cli test
     } else {

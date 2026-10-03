@@ -14,6 +14,7 @@ GROUPS = [
     dict(id='miniclaw-files', title='资料读取', description='读取工作区UTF-8文本，不能越界。', tools=['miniclaw_list_files', 'miniclaw_read_file'], required=True),
     dict(id='miniclaw-artifacts', title='保存文本产物', description='仅创建artifacts内的TXT/Markdown/JSON/CSV，不覆盖，不运行脚本。', tools=['miniclaw_save_artifact'], required=False),
     dict(id='miniclaw-skills', title='让模型查阅技能', description='加载原生Skills索引，允许模型按需读取技能正文与参考文件；不授予执行或修改权限。', tools=['skills_list', 'skill_view'], required=False),
+    dict(id='miniclaw-images', title='图片编辑', description='对本对话图片调色、裁剪、旋转、翻转、缩放；AI编辑使用百炼并可能计费。原图保留。', tools=['miniclaw_image_list', 'miniclaw_edit_image', 'miniclaw_image_status'], required=False),
 ]
 KNOWN_TOOLS = {t for g in GROUPS for t in g['tools']} | {'terminal'}
 TEXT_FLOW_HASHES = {'humanizer': '887d5e3467a682da9b166e5293007f8bbbc299f8a6718ae00f26161b7d062b04'}
@@ -33,6 +34,9 @@ def install(app, root):
     from tui_gateway.contracts import registry
     from tui_gateway.contracts.base import Params, Result
     store = Store(Path(root) / '.hermes')
+    from .images import ImageJobs, set_service
+    image_jobs = ImageJobs(store)
+    set_service(image_jobs)
     router = APIRouter(prefix='/api/miniclaw')
 
     async def body(request, cap=160 * 1024):
@@ -65,9 +69,13 @@ def install(app, root):
         try:
             declared = store.get('bindings', name)
         except ValueError:
-            if TEXT_FLOW_HASHES.get(name) != digest(text):
+            bundled = Path(root) / 'skills' / 'product-image-edit' / 'SKILL.md'
+            if name == 'product-image-edit' and bundled.is_file() and bundled.read_text(encoding='utf-8') == text:
+                declared = dict(version=1, required_tools=['miniclaw_image_list', 'miniclaw_edit_image', 'miniclaw_image_status'], content_hash=digest(text))
+            elif TEXT_FLOW_HASHES.get(name) == digest(text):
+                declared = dict(version=1, required_tools=[], content_hash=digest(text))
+            else:
                 return None
-            declared = dict(version=1, required_tools=[], content_hash=digest(text))
             store.put('bindings', name, declared)
         return {**declared, 'current': declared['content_hash'] == digest(text)}
 
@@ -221,6 +229,64 @@ def install(app, root):
     async def turns(owner: str):
         return await asyncio.to_thread(store.turns, owner)
 
+    def image_session(session_id):
+        if not isinstance(session_id, str):
+            raise HTTPException(400, '运行会话标识无效')
+        session, error = server._sess_nowait({'session_id': session_id}, None)
+        if error or session.get('agent') is None:
+            raise HTTPException(409, '对话正在初始化或已失效，请稍后再试')
+        loaded = {d['function']['name'] for d in session['agent'].tools}
+        if 'miniclaw_edit_image' not in loaded:
+            raise HTTPException(403, '请在设置→工具中启用图片编辑，再新建对话')
+        return session
+
+    @router.get('/image-jobs')
+    async def image_history(owner: str):
+        return await asyncio.to_thread(image_jobs.history, owner)
+
+    @router.get('/image-jobs/{identifier}')
+    async def image_status(identifier: str, owner: str):
+        try:
+            return await asyncio.to_thread(image_jobs.get, owner, identifier)
+        except ValueError:
+            raise HTTPException(404, '修图任务不可用') from None
+
+    @router.post('/image-jobs')
+    async def image_submit(request: Request):
+        payload = await body(request)
+        if set(payload) != {'session_id', 'source_id', 'operation', 'params', 'request_id'}:
+            raise HTTPException(400, '修图请求字段无效')
+        session = image_session(payload['session_id'])
+        if session.get('running'):
+            raise HTTPException(409, '聊天正在执行，请等待完成后手动修图')
+        def persist_session():
+            # Manual edits are real activity even before the first chat message.
+            # Use native row creation so closing/restarting cannot orphan versions.
+            if server._ensure_session_db_row(session) is False:
+                raise HTTPException(503, '会话存储不可用，未开始修图')
+            with server._session_db(session) as db:
+                if db is None or not db.get_session(session['session_key']):
+                    raise HTTPException(503, '无法保存修图会话，未开始任务')
+                if not db.get_session(session['session_key']).get('title'):
+                    from datetime import datetime
+                    title = db.get_next_title_in_lineage('图片编辑 · ' + datetime.now().strftime('%m-%d %H:%M'))
+                    db.set_auto_title(session['session_key'], title, source='derived')
+        try:
+            return await asyncio.to_thread(image_jobs.submit, session['session_key'], payload['source_id'], payload['operation'], payload['params'], payload['request_id'], persist_session)
+        except (ValueError, TypeError) as error:
+            raise HTTPException(400, str(error) if isinstance(error, ValueError) else '修图参数无效') from None
+
+    @router.post('/image-jobs/{identifier}/cancel')
+    async def image_cancel(identifier: str, request: Request):
+        payload = await body(request)
+        if not isinstance(payload.get('session_id'), str): raise HTTPException(400, '运行会话标识无效')
+        session, error = server._sess_nowait({'session_id': payload.get('session_id')}, None)
+        if error: raise HTTPException(409, '运行会话已失效')
+        try:
+            return await asyncio.to_thread(image_jobs.cancel, session['session_key'], identifier)
+        except ValueError:
+            raise HTTPException(404, '修图任务不可用') from None
+
     @router.get('/artifacts/{name}')
     async def artifact(name: str):
         import re
@@ -282,8 +348,15 @@ def install(app, root):
             extra, images, attachments = prompt_material(store, owner, params.get('attachments', []))
             if not text.strip() and not attachments:
                 raise ValueError('消息与附件不能同时为空')
-            if images and not native_images(session):
+            loaded = {d['function']['name'] for d in getattr(session.get('agent'), 'tools', [])}
+            image_refs = [r for r in attachments if r['kind'] == 'image']
+            if image_refs:
+                extra += '\n\n本轮图片附件ID（仅作为引用数据，修图工具使用source_id；不可传宿主路径）：' + json.dumps(image_refs, ensure_ascii=False)
+            if images and not native_images(session) and 'miniclaw_edit_image' not in loaded:
                 raise ValueError('当前模型未声明视觉能力。图片已保存，可预览；配置视觉模型后再发送。')
+            if images and not native_images(session):
+                images = []
+                extra += '\n当前聊天模型不能直接看图；可以按明确指令调用修图工具，不能声称看到了图片内容。'
             model_text, display = text or '请分析附件中的资料。', text
             if skill:
                 from hermes_cli.skills_config import get_disabled_skills

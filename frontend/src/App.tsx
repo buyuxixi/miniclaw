@@ -6,6 +6,8 @@ import { SidebarSessions } from './SidebarSessions';
 import { SettingsDialog } from './SettingsDialog';
 import { Composer } from './Composer';
 import { Icon, type IconName } from './Icon';
+import { ImageWorkspace } from './ImageWorkspace';
+import type { Attachment } from './attachments';
 
 const suggestions = [
   { icon: 'chat', title: '梳理一个想法', detail: '把目标拆成可以开始的步骤', prompt: '我想做一个面向抖音带货的智能助手，帮我梳理一个不依赖大量数据的切入点。' },
@@ -15,7 +17,8 @@ const suggestions = [
 
 export function App({ controller }: { controller: ChatController }) {
   const chat = useChat(controller);
-  const [suggestion, setSuggestion] = useState<{ text: string; nonce: number }>();
+  const [suggestion, setSuggestion] = useState<{ text: string; nonce: number; attachment?: Attachment }>();
+  const [imageEditor, setImageEditor] = useState<{ initial?: Attachment }>();
   const [following, setFollowing] = useState(true);
   const conversation = useRef<HTMLDivElement>(null);
   const followRef = useRef(true);
@@ -44,7 +47,7 @@ export function App({ controller }: { controller: ChatController }) {
     </aside>
     <main className="main-panel">
       <header className="topbar"><button className="mobile-menu icon-button" onClick={() => setSidebar(true)} aria-label="打开侧栏"><Icon name="menu" /></button>
-        <span className="topbar-title">{title}</span><span className="topbar-right">{readOnly && <button className="workspace-mode" title="本对话未加载写文件工具，可在设置中选择受限工具后新建对话" onClick={() => { setSettingsTab('tools'); setSettings(true); }}><Icon name="lock" size={14} />只读工作区</button>}<span className={`status-dot ${connected ? 'online' : ''}`} /><span className="connection-label">{connected ? '已连接' : chat.connection === 'connecting' ? '连接中' : '未连接'}</span></span>
+        <span className="topbar-title">{title}</span><span className="topbar-right"><button className="workspace-mode" disabled={!chat.storedId || chat.busy} onClick={() => setImageEditor({})}><Icon name="image" size={14} />修图</button>{readOnly && <button className="workspace-mode" title="本对话未加载写文件工具，可在设置中选择受限工具后新建对话" onClick={() => { setSettingsTab('tools'); setSettings(true); }}><Icon name="lock" size={14} />只读工作区</button>}<span className={`status-dot ${connected ? 'online' : ''}`} /><span className="connection-label">{connected ? '已连接' : chat.connection === 'connecting' ? '连接中' : '未连接'}</span></span>
       </header>
       <div className="conversation" ref={conversation} onScroll={event => { const el = event.currentTarget; const near = el.scrollHeight - el.clientHeight - el.scrollTop < 100; followRef.current = near; setFollowing(near); }}>
         {!chat.items.length ? <section className="welcome">
@@ -52,7 +55,7 @@ export function App({ controller }: { controller: ChatController }) {
           <div className="suggestions">{suggestions.map(suggestion => <button key={suggestion.title} onClick={() => { setSuggestion({ text: suggestion.prompt, nonce: Date.now() }); }}>
             <span className="suggestion-icon"><Icon name={suggestion.icon as IconName} size={21} /></span><strong>{suggestion.title}</strong><p>{suggestion.detail}</p>
           </button>)}</div>
-        </section> : <div className="transcript">{chat.items.map(item => <Message key={item.id} item={item} owner={chat.storedId} onReuse={text => setSuggestion({ text, nonce: Date.now() })} />)}
+        </section> : <div className="transcript">{chat.items.map(item => <Message key={item.id} item={item} owner={chat.storedId} onReuse={text => setSuggestion({ text, nonce: Date.now() })} onEdit={initial => setImageEditor({ initial })} />)}
           {chat.running && <div className="run-status"><span className="loading-dot" />{chat.status || '正在执行'}</div>}
           {!chat.running && chat.status && <div className="run-status">{chat.status}</div>}
           <div ref={bottom} /></div>}
@@ -64,6 +67,7 @@ export function App({ controller }: { controller: ChatController }) {
       </div>
     </main>
     {settings && <SettingsDialog controller={controller} chat={chat} initialTab={settingsTab} onClose={() => setSettings(false)} />}
+    {imageEditor && <ImageWorkspace key={chat.storedId} controller={controller} chat={chat} initial={imageEditor.initial} onClose={() => { setImageEditor(undefined); void controller.refresh(); }} onTools={() => { setImageEditor(undefined); setSettingsTab('tools'); setSettings(true); }} onUse={attachment => { setSuggestion({ text: '', attachment, nonce: Date.now() }); setImageEditor(undefined); void controller.refresh(); }} />}
 
   </div>;
 }

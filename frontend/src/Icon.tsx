@@ -1,6 +1,7 @@
-export type IconName = 'plus' | 'menu' | 'settings' | 'search' | 'close' | 'chat' | 'file' | 'edit' | 'skills' | 'arrow' | 'stop' | 'copy' | 'check' | 'chevron' | 'lock' | 'archive';
+export type IconName = 'plus' | 'menu' | 'settings' | 'search' | 'close' | 'chat' | 'file' | 'edit' | 'skills' | 'arrow' | 'stop' | 'copy' | 'check' | 'chevron' | 'lock' | 'archive' | 'image';
 const paths: Record<IconName, string> = {
   plus: 'M12 5v14M5 12h14', menu: 'M4 6h16M4 12h16M4 18h16',
+  image: 'M3 3h18v18H3V3Z M3 16l6-6 5 5 3-3 4 4M15 7h.01',
   archive: 'M3 3h18v5H3V3Z M5 8v13h14V8M9 12h6',
   settings: 'M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1 1-3Z M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',
   search: 'M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z', close: 'M6 6l12 12M6 18 18 6',

@@ -19,6 +19,7 @@ class Store:
                 CREATE TABLE IF NOT EXISTS attachments (id TEXT PRIMARY KEY, owner TEXT NOT NULL, data TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS turns (row_id INTEGER PRIMARY KEY, owner TEXT NOT NULL, data TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS bindings (name TEXT PRIMARY KEY, data TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS image_jobs (id TEXT PRIMARY KEY, owner TEXT NOT NULL, data TEXT NOT NULL);
             ''')
 
     @contextmanager
@@ -31,7 +32,7 @@ class Store:
             db.close()
 
     def put(self, table, key, data, owner=None):
-        if table not in ('attachments', 'turns', 'bindings'):
+        if table not in ('attachments', 'turns', 'bindings', 'image_jobs'):
             raise ValueError('Unknown table')
         column = 'row_id' if table == 'turns' else 'name' if table == 'bindings' else 'id'
         with self.connect() as db:
@@ -41,7 +42,7 @@ class Store:
                 db.execute(f'INSERT OR REPLACE INTO {table} ({column}, owner, data) VALUES (?, ?, ?)', (key, owner, json.dumps(data, ensure_ascii=False)))
 
     def get(self, table, key, owner=None):
-        if table not in ('attachments', 'turns', 'bindings'):
+        if table not in ('attachments', 'turns', 'bindings', 'image_jobs'):
             raise ValueError('Unknown table')
         column = 'row_id' if table == 'turns' else 'name' if table == 'bindings' else 'id'
         with self.connect() as db:
@@ -53,3 +54,13 @@ class Store:
     def turns(self, owner):
         with self.connect() as db:
             return {str(row): json.loads(data) for row, data in db.execute('SELECT row_id,data FROM turns WHERE owner=?', (owner,))}
+
+    def images(self, owner):
+        with self.connect() as db:
+            rows = db.execute('SELECT data FROM attachments WHERE owner=? ORDER BY rowid DESC LIMIT 200', (owner,)).fetchall()
+        return [json.loads(row[0]) for row in rows if json.loads(row[0]).get('kind') == 'image']
+
+    def image_jobs(self, owner=None):
+        with self.connect() as db:
+            rows = db.execute('SELECT data FROM image_jobs' + (' WHERE owner=?' if owner is not None else '') + ' ORDER BY rowid DESC', (owner,) if owner is not None else ()).fetchall()
+        return [json.loads(row[0]) for row in rows]
