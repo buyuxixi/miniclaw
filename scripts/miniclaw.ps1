@@ -46,6 +46,8 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Basic API checks failed' }
         & $pythonPath (Join-Path $projectRoot 'tests\test_images.py')
         if ($LASTEXITCODE -ne 0) { throw 'Image editing checks failed' }
+        & $pythonPath (Join-Path $projectRoot 'tests\test_canvas.py')
+        if ($LASTEXITCODE -ne 0) { throw 'Canvas checks failed' }
         Set-Location (Join-Path $projectRoot 'frontend')
         & $runtimeConfig.node $runtimeConfig.npm_cli test
     } else {

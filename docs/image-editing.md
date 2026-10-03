@@ -2,7 +2,7 @@
 
 这版接入的是商品修图的第一条完整链路：上传图片，手动编辑或在聊天中选“商品修图”，生成新版本，比较、下载，再从结果继续修改。模型继续使用 Hermes 的 Agent loop；手动按钮和模型工具调用共用同一个执行服务。
 
-参考项目为 [ai-picture-editor](https://github.com/yuyuanweb/ai-picture-editor)，审阅提交 `49f6ad8c96740a68b7e6228a47e8e2be6876eb34`。没有复制该项目应用源码，也没有引入其 LangGraph、Postgres、Redis 或对象存储部署。当前实现不包含完整画布、图层、SAM 选区或全部工具迁移。
+参考项目为 [ai-picture-editor](https://github.com/yuyuanweb/ai-picture-editor)，审阅提交 `49f6ad8c96740a68b7e6228a47e8e2be6876eb34`。没有复制其应用源码，也没有引入其LangGraph、Postgres、Redis或对象存储。本文介绍会话内快捷编辑；后续接入的独立项目、图层画布与SAM选区见[画布App](canvas-app.md)，没有迁移全部营销/批处理工具。
 
 ## 使用
 
@@ -90,7 +90,7 @@ sequenceDiagram
 .\.venv\Scripts\python.exe .\scripts\verify_images_live.py --model
 ```
 
-本版按单人、单后端进程使用设计；图片清单最多200项、修改记录最多100项，没有磁盘配额、删除/过期清理、多用户账户或多进程任务协调。完整画布、选区、批处理可在 operation/provider 入口扩展，需要另定交互和权限。智能路由与敏感拦截等待共同设计。
+快捷编辑按单人、单后端进程设计，图片清单最多200项、修改记录最多100项，没有磁盘配额、删除/过期清理、多用户账户或多进程协调。完整画布和选区由独立图片项目模块提供，仍共享百炼Provider和Hermes。批处理留待后续；智能路由与敏感拦截等待共同设计。
 
 ## 可以继续追问
 

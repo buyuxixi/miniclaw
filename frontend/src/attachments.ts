@@ -1,5 +1,5 @@
 import { writeApi } from './management-api';
-export interface Attachment { id: string; name: string; kind: 'image' | 'text'; mime: string; bytes: number }
+export interface Attachment { id: string; name: string; kind: 'image' | 'text'; mime: string; bytes: number; canvas_project_id?: string }
 export interface TurnDisplay { text: string; attachments: Attachment[]; skill?: string }
 export async function uploadFile(owner: string, file: File): Promise<Attachment> {
   const text = /\.(txt|md|markdown)$/i.test(file.name);

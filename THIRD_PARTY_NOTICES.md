@@ -9,3 +9,5 @@ miniclaw 前端直接引用该 submodule 中的共享 JSON-RPC 客户端；Agent
 根目录 miniclaw 自有代码的许可尚未选定，本版不新增根 LICENSE。
 
 图片编辑接入参考了 [yuyuanweb/ai-picture-editor](https://github.com/yuyuanweb/ai-picture-editor) 的功能与 Provider 结构（审阅提交 `49f6ad8c96740a68b7e6228a47e8e2be6876eb34`）。本仓库未复制其应用源码；图片工作区、执行器、工具和百炼适配为独立实现，使用既有 Pillow/httpx 依赖和公开 API。
+
+画布使用 [Konva](https://github.com/konvajs/konva) 与 [react-konva](https://github.com/konvajs/react-konva)，两者采用MIT许可，许可随已安装包提供，版本固定在npm锁文件。点选使用 [rembg](https://github.com/danielgatis/rembg) 公共接口（MIT），ONNX SAM权重来自官方发布资产，原始 [Segment Anything](https://github.com/facebookresearch/segment-anything) 项目采用Apache-2.0许可。Python可选依赖固定在 `canvas-requirements.txt`，权重没有提交进仓库。

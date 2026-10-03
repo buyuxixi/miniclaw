@@ -238,6 +238,56 @@ class BasicAPI(unittest.TestCase):
         self.assertEqual(result['context_used'], 2345)
         self.assertEqual(result['estimated_total'], 1000)
 
+    def test_independent_canvas_http_document_cas_and_owned_export_to_chat(self):
+        from miniclaw_web.canvas_document import blank, layer_base
+        project = CLIENT.post('/api/miniclaw/canvas/projects', json={'name': '独立画布'}).json()
+        path = '/api/miniclaw/canvas/projects/' + project['id']
+        doc = blank(120,80)
+        doc['layers'] = [layer_base('shape','色块',40,30,x=10,y=15,shape='rectangle',fill='#ff0000')]
+        saved = CLIENT.put(path+'/document', json={'revision':0,'document':doc}).json()
+        self.assertEqual(CLIENT.put(path+'/document',json={'revision':0,'document':doc}).status_code,409)
+        result = CLIENT.get(path+'/export')
+        image = Image.open(io.BytesIO(result.content));self.assertEqual(image.size,(120,80));self.assertEqual(image.getpixel((20,20)),(255,0,0,255))
+        linked = CLIENT.patch(path,json={'revision':saved['revision'],'session_id':'test-live'}).json()
+        self.assertEqual(linked['chat_id'],'owner-one')
+        sent = CLIENT.post(path+'/send-chat',json={'session_id':'test-live'}).json()
+        self.assertEqual(sent['canvas_project_id'],project['id'])
+        self.assertEqual(CLIENT.get('/api/miniclaw/attachments/'+sent['id']+'?owner=other').status_code,404)
+
+    def test_canvas_turn_rejects_unlinked_stale_missing_tools_and_clears_context(self):
+        from miniclaw_web.canvas_document import blank, layer_base
+        project = CLIENT.post('/api/miniclaw/canvas/projects',json={}).json();path='/api/miniclaw/canvas/projects/'+project['id']
+        doc=blank();layer=layer_base('shape','矩形',100,100,shape='rectangle',fill='#ff0000');doc['layers']=[layer]
+        project=CLIENT.put(path+'/document',json={'revision':0,'document':doc}).json()
+        ctx=dict(project_id=project['id'],revision=project['revision'],layer_id=layer['id'])
+        self.assertIn('error',self.submit(canvas_context=ctx))
+        project=CLIENT.patch(path,json={'revision':project['revision'],'session_id':'test-live'}).json();ctx['revision']=project['revision']
+        self.assertIn('error',self.submit(canvas_context=ctx))
+        self.session['agent'].tools=[{'function':{'name':'miniclaw_canvas_view'}}]
+        with patch.dict(server._methods,{'prompt.submit':lambda rid,p:server._ok(rid,{'status':'streaming'})}):
+            self.assertNotIn('error',self.submit(canvas_context=ctx));self.assertEqual(self.session['miniclaw_canvas_turn']['project_id'],project['id'])
+            self.assertNotIn('error',self.submit());self.assertIsNone(self.session['miniclaw_canvas_turn'])
+        ctx['revision']-=1;self.assertIn('error',self.submit(canvas_context=ctx))
+
+    def test_canvas_model_cannot_use_a_selection_changed_after_turn_submission(self):
+        from miniclaw_web.canvas_document import blank, layer_base
+        from miniclaw_web.canvas_tools import canvas_tool
+        project=CLIENT.post('/api/miniclaw/canvas/projects',json={}).json();path='/api/miniclaw/canvas/projects/'+project['id']
+        stream=io.BytesIO();Image.new('RGB',(80,60),'blue').save(stream,'PNG')
+        asset=CLIENT.post(path+'/assets',json={'name':'fixture.png','data':base64.b64encode(stream.getvalue()).decode()}).json()
+        layer=layer_base('image','图片',80,60,asset_id=asset['id']);doc=blank(80,60);doc['layers']=[layer]
+        project=CLIENT.put(path+'/document',json={'revision':0,'document':doc}).json()
+        project=CLIENT.patch(path,json={'revision':project['revision'],'session_id':'test-live'}).json()
+        payload={'revision':project['revision'],'layer_id':layer['id'],'mode':'rectangle','points':[[10,10],[20,20]]}
+        CLIENT.post(path+'/selection',json=payload)
+        self.session['agent'].tools=[{'function':{'name':name}} for name in ('miniclaw_canvas_view','miniclaw_canvas_region')]
+        with patch.dict(server._methods,{'prompt.submit':lambda rid,p:server._ok(rid,{'status':'streaming'})}):
+            self.submit(canvas_context={'project_id':project['id'],'revision':project['revision'],'layer_id':layer['id']})
+        payload['points']=[[30,30],[40,40]];CLIENT.post(path+'/selection',json=payload)
+        result=json.loads(canvas_tool('miniclaw_canvas_region',{'operation':'erase','params':{}},'owner-one'))
+        self.assertFalse(result['success']);self.assertIn('选区已改变',result['error'])
+        self.assertEqual(CLIENT.get(path).json()['revision'],project['revision'])
+
 
 if __name__ == '__main__':
     try:

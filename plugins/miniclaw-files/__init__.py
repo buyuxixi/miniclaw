@@ -91,6 +91,22 @@ def register(ctx):
             'required': ['name', 'content'], 'additionalProperties': False,
         }}, handler=lambda args, **kwargs: _save_artifact(ctx, args))
     register_images(ctx)
+    register_canvas(ctx)
+
+
+def register_canvas(ctx):
+    definitions = [
+        ('miniclaw_canvas_view', 'Read the project linked to this trusted editor turn. Returns compact layer metadata, not image understanding.', {}, []),
+        ('miniclaw_canvas_region', 'Apply adjust, erase or extract to the frozen target image layer and existing selection. After an edit the selection is cleared. Preserves pixels outside the mask. params contains adjust brightness/contrast/saturation/sharpness -1..1 or is empty.', {'operation': {'type':'string','enum':['adjust','erase','extract']}, 'params': {'type':'object'}}, ['operation','params']),
+        ('miniclaw_canvas_ai', 'Submit paid DashScope editing on the frozen target layer. region=true uses the existing selection. Produces a candidate; the user must adopt it. queued/running is not success; never repeat uncertain paid requests automatically.', {'prompt':{'type':'string','maxLength':2000},'request_id':{'type':'string','minLength':8,'maxLength':80},'region':{'type':'boolean'}}, ['prompt','request_id','region']),
+        ('miniclaw_canvas_job', 'Read a job belonging to this turn project. Only succeeded with output means a candidate exists.', {'job_id':{'type':'string'}}, ['job_id']),
+    ]
+    for name,description,properties,required in definitions:
+        def handler(args,session_id=None,_name=name,**kwargs):
+            from miniclaw_web.canvas_tools import canvas_tool
+            return canvas_tool(_name,args,session_id)
+        ctx.register_tool(name=name,toolset='miniclaw-canvas',description=description,
+            schema={'name':name,'description':description,'parameters':{'type':'object','properties':properties,'required':required,'additionalProperties':False}},handler=handler)
 
 
 def register_images(ctx):

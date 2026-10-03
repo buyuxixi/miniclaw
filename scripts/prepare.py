@@ -31,11 +31,12 @@ def main():
         })
     print(f"Configuration: {config_path}")
     print(f"Credentials: {env_path} (values not displayed)")
-    bundled = ROOT / 'skills' / 'product-image-edit' / 'SKILL.md'
-    target = home / 'skills' / 'product-image-edit' / 'SKILL.md'
-    if bundled.is_file() and not target.exists():
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(bundled, target)
+    for name in ('product-image-edit', 'canvas-editor'):
+        bundled = ROOT / 'skills' / name / 'SKILL.md'
+        target = home / 'skills' / name / 'SKILL.md'
+        if bundled.is_file() and not target.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(bundled, target)
 
 
 if __name__ == "__main__":

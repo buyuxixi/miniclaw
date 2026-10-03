@@ -1,0 +1,2 @@
+# Optional local point selection; isolated in the project's Python environment.
+rembg[cpu]==2.0.85

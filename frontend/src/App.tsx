@@ -15,7 +15,7 @@ const suggestions = [
   { icon: 'edit', title: '改写一段文案', detail: '让表达自然、清晰、更容易理解', prompt: '帮我把这句话改得更自然，不添加未经证实的功效：本工具将充分赋能业务实现高效协同。' },
 ];
 
-export function App({ controller }: { controller: ChatController }) {
+export function App({ controller, onCanvas, externalSuggestion, settingsNonce }: { controller: ChatController; onCanvas?: (attachment?: Attachment) => void; externalSuggestion?: { attachment: Attachment; nonce: number }; settingsNonce?: number }) {
   const chat = useChat(controller);
   const [suggestion, setSuggestion] = useState<{ text: string; nonce: number; attachment?: Attachment }>();
   const [imageEditor, setImageEditor] = useState<{ initial?: Attachment }>();
@@ -30,6 +30,8 @@ export function App({ controller }: { controller: ChatController }) {
   const title = chat.info.title || chat.sessions.find(s => s.id === chat.storedId)?.title || '新对话';
   const tools = Object.values(chat.info.tools ?? {}).flat();
   const readOnly = tools.length > 0 && tools.every(name => ['miniclaw_list_files', 'miniclaw_read_file', 'skills_list', 'skill_view'].includes(name));
+  useEffect(() => { if (externalSuggestion) setSuggestion({ text: '', ...externalSuggestion }); }, [externalSuggestion?.nonce]);
+  useEffect(() => { if (settingsNonce) { setSettingsTab('tools'); setSettings(true); } }, [settingsNonce]);
   useEffect(() => { if (followRef.current) bottom.current?.scrollIntoView({ behavior: 'instant' }); }, [chat.items.length, chat.items.at(-1)?.text, chat.running]);
   useEffect(() => { followRef.current = true; setFollowing(true); conversation.current?.scrollTo({ top: conversation.current.scrollHeight }); }, [chat.storedId]);
   function follow() { followRef.current = true; setFollowing(true); bottom.current?.scrollIntoView({ behavior: 'smooth' }); }
@@ -39,6 +41,7 @@ export function App({ controller }: { controller: ChatController }) {
     {sidebar && <button className="sidebar-scrim" aria-label="关闭侧栏" onClick={() => setSidebar(false)} />}
     <aside className={`sidebar ${sidebar ? 'visible' : ''}`}>
       <div className="brand"><span className="brand-mark">m</span><strong>miniclaw</strong><span className="beta">预览</span></div>
+      {onCanvas && <nav className="app-module-switch" aria-label="应用模块"><button className="active">聊天</button><button onClick={() => { onCanvas(); setSidebar(false); }}>图片工作区</button></nav>}
       <button className="new-chat" disabled={chat.running || chat.busy || !connected} onClick={() => { void controller.newSession(); setSidebar(false); setSuggestion(undefined); }}><Icon name="plus" />新建对话</button>
       <SidebarSessions controller={controller} chat={chat} onSelect={() => { setSidebar(false); setSuggestion(undefined); }} />
       <div className="sidebar-bottom"><button className="settings-button" onClick={() => { setSettingsTab('general'); setSettings(true); }}><Icon name="settings" /><span>设置</span></button>
@@ -67,7 +70,7 @@ export function App({ controller }: { controller: ChatController }) {
       </div>
     </main>
     {settings && <SettingsDialog controller={controller} chat={chat} initialTab={settingsTab} onClose={() => setSettings(false)} />}
-    {imageEditor && <ImageWorkspace key={chat.storedId} controller={controller} chat={chat} initial={imageEditor.initial} onClose={() => { setImageEditor(undefined); void controller.refresh(); }} onTools={() => { setImageEditor(undefined); setSettingsTab('tools'); setSettings(true); }} onUse={attachment => { setSuggestion({ text: '', attachment, nonce: Date.now() }); setImageEditor(undefined); void controller.refresh(); }} />}
+    {imageEditor && <ImageWorkspace key={chat.storedId} controller={controller} chat={chat} initial={imageEditor.initial} onCanvas={onCanvas ? attachment => { setImageEditor(undefined); onCanvas(attachment); } : undefined} onClose={() => { setImageEditor(undefined); void controller.refresh(); }} onTools={() => { setImageEditor(undefined); setSettingsTab('tools'); setSettings(true); }} onUse={attachment => { setSuggestion({ text: '', attachment, nonce: Date.now() }); setImageEditor(undefined); void controller.refresh(); }} />}
 
   </div>;
 }

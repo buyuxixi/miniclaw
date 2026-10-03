@@ -120,7 +120,7 @@ export class ChatController {
     } catch (error) { if (generation === this.selection) this.fail(error); }
   }
 
-  async send(text: string, skill?: string, attachments: Attachment[] = []): Promise<boolean> {
+  async send(text: string, skill?: string, attachments: Attachment[] = [], canvasContext?: { project_id: string; revision: number; layer_id: string }): Promise<boolean> {
     if ((!text.trim() && !attachments.length) || this.state.running || this.state.busy || !this.state.sessionId || this.connection !== 'open') return false;
     const previous = this.state.items;
     const sessionId = this.state.sessionId;
@@ -134,7 +134,7 @@ export class ChatController {
       this.preparingSkill = false;
       this.patch({ items: [...previous, { id: crypto.randomUUID(), kind: 'user', text: prompt.display, attachments }], status: '正在提交' });
       submitted = true;
-      const accepted = await this.client.request<{ warning?: string }>('miniclaw.turn.submit', { session_id: sessionId, text, skill, attachments: attachments.map(a => a.id) });
+      const accepted = await this.client.request<{ warning?: string }>('miniclaw.turn.submit', { session_id: sessionId, text, skill, attachments: attachments.map(a => a.id), ...(canvasContext ? { canvas_context: canvasContext } : {}) });
       if (accepted.warning) this.patch({ error: accepted.warning });
       if (!this.state.running) await this.reconcile(sessionId, this.selection);
       return true;

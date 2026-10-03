@@ -63,7 +63,7 @@ def upload(store, owner, name, data):
 
 
 def public(record):
-    return {key: record[key] for key in ('id', 'name', 'kind', 'mime', 'bytes')}
+    return {key: record[key] for key in ('id', 'name', 'kind', 'mime', 'bytes', 'canvas_project_id') if key in record}
 
 
 def prompt_material(store, owner, identifiers):

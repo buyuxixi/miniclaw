@@ -1,7 +1,8 @@
 import { createRoot } from 'react-dom/client';
-import { App } from './App';
+import { AppShell } from './AppShell';
 import { ChatController } from './chat-controller';
 import './styles.css';
+import './canvas.css';
 
 const controller = new ChatController();
-createRoot(document.getElementById('root')!).render(<App controller={controller} />);
+createRoot(document.getElementById('root')!).render(<AppShell controller={controller} />);

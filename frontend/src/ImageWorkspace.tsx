@@ -7,9 +7,10 @@ import { imageLabels, jobLabels, type ImageHistory, type ImageJob } from './imag
 import { ImageComparison } from './ImageJobCard';
 import { Icon } from './Icon';
 
-export function ImageWorkspace({ controller, chat, initial, onClose, onUse, onTools }: {
+export function ImageWorkspace({ controller, chat, initial, onClose, onUse, onTools, onCanvas }: {
   controller: ChatController; chat: ChatState; initial?: Attachment;
   onClose: () => void; onUse: (image: Attachment) => void; onTools: () => void;
+  onCanvas?: (image: Attachment) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null); const picker = useRef<HTMLInputElement>(null);
   const [history, setHistory] = useState<ImageHistory>(); const [selected, setSelected] = useState(initial?.id ?? '');
@@ -64,6 +65,7 @@ export function ImageWorkspace({ controller, chat, initial, onClose, onUse, onTo
   }
   return <dialog ref={dialog} className="image-workspace" aria-label="图片编辑" onCancel={onClose}>
     <header className="image-workspace-header"><div><h2>图片编辑</h2><p>保留原图，每次修改都是一个新版本。</p></div><button className="icon-button" aria-label="关闭图片编辑" onClick={onClose}><Icon name="close" /></button></header>
+    {onCanvas && source && <button className="secondary-action" disabled={blocked} onClick={() => onCanvas(source)}>打开完整画布 · 图层与选区</button>}
     <div className="image-workspace-body">
       <aside className="image-controls">
         <input ref={picker} hidden type="file" accept=".png,.jpg,.jpeg,.webp" onChange={e => { void add(e.target.files?.[0]); e.target.value = ''; }} />
