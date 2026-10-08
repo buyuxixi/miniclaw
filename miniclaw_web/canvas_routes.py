@@ -38,7 +38,8 @@ def routes(service, body, resolve_session, persist_session):
 
     @router.get("/capabilities")
     async def capabilities():
-        return {"sam": status(), "cloud": provider_status()}
+        from .media_models import catalog
+        return {"sam": status(), "cloud": provider_status(), "image_models":[m for m in catalog() if 'edit' in m['tasks']]}
 
     @router.post("/sam/prepare")
     async def sam_prepare():
@@ -88,15 +89,69 @@ def routes(service, body, resolve_session, persist_session):
     async def history(project: str):
         return await call(service.history, project)
 
+    @router.get('/projects/{project}/versions')
+    async def versions(project: str,page:int=1,page_size:int=20):
+        await call(service.get,project)
+        return await call(service.store.versions.page,'canvas:'+project,'document','document',page,page_size)
+    @router.get('/projects/{project}/versions/{version_id}')
+    async def version_detail(project:str,version_id:str):
+        return await call(service.store.versions.detail,'canvas:'+project,version_id)
+
+    @router.post('/projects/{project}/versions/restore')
+    async def restore_version(project: str, request: Request):
+        p=await body(request)
+        if set(p)!={'revision','version_id'}:raise HTTPException(400,'需要当前版本和历史版本ID')
+        return await call(service.restore_version,project,p['revision'],p['version_id'])
+
+    @router.get('/projects/{project}/plans')
+    async def plans(project: str):
+        return await call(service.plans.list, project)
+
+    @router.post('/projects/{project}/plans')
+    async def propose(project: str, request: Request):
+        p = await body(request)
+        if set(p) != {'revision', 'layer_id', 'goal', 'preserve', 'steps'}:
+            raise HTTPException(400, '修改方案字段无效')
+        return await call(service.plans.propose, project, p['revision'], p['layer_id'], p['goal'], p['preserve'], p['steps'])
+
+    @router.post('/projects/{project}/plans/{plan_id}/preview')
+    async def plan_preview(project: str, plan_id: str, request: Request):
+        p = await body(request)
+        if set(p) != {'revision'}:
+            raise HTTPException(400, '需要当前revision')
+        return Response(await call(service.plans.preview, project, plan_id, p['revision']),
+                        media_type='image/png', headers={'Cache-Control': 'no-store'})
+
+    @router.post('/projects/{project}/plans/{plan_id}/apply')
+    async def plan_apply(project: str, plan_id: str, request: Request):
+        p = await body(request)
+        if set(p) != {'revision'}:
+            raise HTTPException(400, '需要当前revision')
+        return await call(service.plans.apply, project, plan_id, p['revision'])
+
+    @router.post('/projects/{project}/plans/{plan_id}/generate')
+    async def plan_generate(project: str, plan_id: str, request: Request):
+        p = await body(request)
+        if set(p) != {'revision'}:
+            raise HTTPException(400, '需要当前revision')
+        return await call(service.plans.generate, project, plan_id, p['revision'])
+
+    @router.post('/projects/{project}/plans/{plan_id}/cancel')
+    async def plan_cancel(project: str, plan_id: str, request: Request):
+        p = await body(request)
+        if p:
+            raise HTTPException(400, '取消方案无需参数')
+        return await call(service.plans.cancel, project, plan_id)
+
     @router.post("/projects/{project}/restore")
     async def restore(project: str, request: Request):
         p = await body(request)
         return await call(service.restore, project, p.get("revision"), p.get("seq"))
 
     @router.get("/projects/{project}/export")
-    async def export(project: str, seq: int | None = None):
+    async def export(project: str, seq: int | None = None, version_id: str | None = None):
         return Response(
-            await call(service.export, project, seq),
+            await call(service.export, project, seq, version_id),
             media_type="image/png",
             headers={
                 "Content-Disposition": 'attachment; filename="canvas.png"',
@@ -104,9 +159,24 @@ def routes(service, body, resolve_session, persist_session):
             },
         )
 
+    @router.post("/projects/{project}/preview")
+    async def preview(project: str, request: Request):
+        p = await body(request)
+        if set(p) != {'revision', 'document'}:
+            raise HTTPException(400, '需要当前revision和候选画布')
+        return Response(await call(service.preview, project, p['revision'], p['document']),
+                        media_type='image/png', headers={'Cache-Control': 'no-store'})
+
     @router.get("/projects/{project}/assets")
     async def assets(project: str):
         return await call(service.assets, project)
+
+    @router.post('/projects/{project}/crop-suggestion')
+    async def crop_suggestion(project: str, request: Request):
+        p = await body(request)
+        if set(p) != {'revision'}:
+            raise HTTPException(400, '需要当前revision')
+        return await call(service.crop_suggestion, project, p['revision'])
 
     @router.post("/projects/{project}/assets")
     async def asset(project: str, request: Request):
@@ -246,6 +316,8 @@ def routes(service, body, resolve_session, persist_session):
             p.get("region", True),
             p.get("feather", 0),
             p.get("selection_id"),
+            model=p.get('model'),
+            provider=p.get('provider', 'dashscope'),
         )
 
     @router.post("/projects/{project}/jobs/{job_id}/{action}")
@@ -255,6 +327,10 @@ def routes(service, body, resolve_session, persist_session):
             return await call(service.cancel, project, job_id)
         if action == "adopt":
             return await call(service.adopt, project, p.get("revision"), job_id)
+        if action == 'review':
+            if set(p) != {'revision', 'decision', 'checks', 'reason'}:
+                raise HTTPException(400, '候选核对字段无效')
+            return await call(service.review_job, project, p['revision'], job_id, p['decision'], p['checks'], p['reason'])
         raise HTTPException(404, "操作不存在")
 
     return router

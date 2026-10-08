@@ -1,9 +1,10 @@
 import { writeApi } from './management-api';
+import type { CreatorTurn } from './creator-api';
 export interface Attachment { id: string; name: string; kind: 'image' | 'text'; mime: string; bytes: number; canvas_project_id?: string }
-export interface TurnDisplay { text: string; attachments: Attachment[]; skill?: string }
+export interface TurnDisplay { text: string; attachments: Attachment[]; skill?: string; creator_context?: CreatorTurn }
 export async function uploadFile(owner: string, file: File): Promise<Attachment> {
-  const text = /\.(txt|md|markdown)$/i.test(file.name);
-  if (!/\.(png|jpe?g|webp|txt|md|markdown)$/i.test(file.name)) throw new Error('支持PNG、JPEG、WebP、TXT和Markdown');
+  const text = /\.(txt|md|markdown|srt)$/i.test(file.name);
+  if (!/\.(png|jpe?g|webp|txt|md|markdown|srt)$/i.test(file.name)) throw new Error('支持PNG、JPEG、WebP、TXT、Markdown和SRT');
   if (!file.size || file.size > (text ? 64 * 1024 : 5 * 1024 * 1024)) throw new Error('文本最大64 KiB，图片最大5 MiB，不能上传空文件');
   const data = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(',')[1]); reader.onerror = () => reject(new Error('文件读取失败')); reader.readAsDataURL(file);

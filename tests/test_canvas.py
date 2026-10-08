@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT), str(ROOT / "hermes-agent")]
-from PIL import Image
+from PIL import Image, ImageDraw
 from miniclaw_web.canvas import Canvas, Conflict
 from miniclaw_web.canvas_document import blank, layer_base, png, render, inverse, affine
 from miniclaw_web.store import Store
@@ -64,6 +64,55 @@ class CanvasTests(unittest.TestCase):
             **kwargs,
         )
 
+    def test_screenshot_crop_suggests_only_a_clear_band_without_mutating_the_canvas(self):
+        from miniclaw_web.screenshot_crop import suggest
+        source = Image.new('RGB', (260, 600), 'black')
+        ImageDraw.Draw(source).rectangle((0, 150, 259, 409), fill=(30, 40, 50))
+        self.assertEqual(suggest(source), {'x':0,'y':150,'width':260,'height':260})
+        for image in [Image.new('RGB', (260, 600), 'gray'), Image.new('RGB', (260,600), 'black'), Image.new('RGB', (260,260), 'gray')]:
+            self.assertIsNone(suggest(image))
+        ambiguous = Image.new('RGB', (260, 800), 'black')
+        draw = ImageDraw.Draw(ambiguous)
+        draw.rectangle((0, 150, 259, 349), fill='gray'); draw.rectangle((0, 450, 259, 649), fill='gray')
+        self.assertIsNone(suggest(ambiguous))
+        p = self.canvas.create('截图')
+        asset = self.canvas.add_asset(p['id'], png(source), 'screenshot.png')
+        doc = blank(260, 600); doc['layers']=[layer_base('image','原图',260,600,asset_id=asset['id'])]
+        p = self.canvas.save(p['id'],0,doc)
+        before = self.canvas.history(p['id'])
+        self.assertEqual(self.canvas.crop_suggestion(p['id'],p['revision'])['y'],150)
+        self.assertEqual(self.canvas.get(p['id']),p)
+        self.assertEqual(self.canvas.history(p['id']),before)
+        with self.assertRaises(Conflict): self.canvas.crop_suggestion(p['id'],0)
+
+    def test_candidate_review_survives_reload_and_rejection_blocks_adoption(self):
+        job_id = 'a' * 32
+        output = self.canvas.add_asset(self.id, png(Image.new('RGB',(80,60),'white')), 'candidate.png')
+        job = {'id':job_id,'project':self.id,'state':'succeeded','revision':1,'layer_id':self.layer['id'],'source_id':self.asset['id'],'output':output,'signature':'immutable-request-signature','input_document':self.doc,'input_mask':None}
+        with self.store.connect() as db:
+            db.execute('INSERT INTO canvas_jobs VALUES (?,?,?)',(job_id,self.id,json.dumps(job)))
+        for checks in [[],['shape','color'],['shape','color','parts','parts']]:
+            with self.assertRaises(ValueError): self.canvas.review_job(self.id,1,job_id,'keep',checks,'')
+        with self.assertRaises(Conflict): self.canvas.review_job(self.id,0,job_id,'reject',[],'纹理变化')
+        other = self.canvas.create()
+        with self.assertRaises(ValueError): self.canvas.review_job(other['id'],0,job_id,'reject',[],'纹理变化')
+        before = self.canvas.get(self.id)
+        self.canvas.review_job(self.id,1,job_id,'reject',[],'纹理磨平，绳线变化')
+        reopened = Canvas(Store(self.temp.name),Held())
+        self.assertEqual(reopened.job(self.id,job_id)['review']['decision'],'reject')
+        self.assertEqual(reopened.get(self.id),before)
+        with self.assertRaises(ValueError): reopened.adopt(self.id,1,job_id)
+        kept = reopened.review_job(self.id,1,job_id,'keep',['shape','color','parts','texture'],'')
+        self.assertEqual(len(kept['reviews']),2)
+        self.assertNotIn('signature',kept)
+        with self.store.connect() as db:
+            raw=json.loads(db.execute('SELECT data FROM canvas_jobs WHERE id=?',(job_id,)).fetchone()[0])
+        self.assertEqual(raw['signature'],'immutable-request-signature')
+        self.assertEqual(raw['input_document'],self.doc)
+        self.assertIn('input_mask',raw)
+        adopted = reopened.adopt(self.id,1,job_id)
+        self.assertEqual(adopted['document']['layers'][0]['asset_id'],output['id'])
+
     def test_project_reopens_without_chat_and_revision_never_rolls_back(self):
         reopened = Canvas(Store(self.temp.name), Held())
         self.assertEqual(reopened.get(self.id)["document"], self.doc)
@@ -75,6 +124,26 @@ class CanvasTests(unittest.TestCase):
         redone = reopened.restore(self.id, 2, 1)
         self.assertEqual(redone["revision"], 3)
         self.assertEqual(redone["document"], self.doc)
+
+    def test_candidate_preview_renders_without_mutating_document_history_or_selection(self):
+        self.select()
+        before = (self.canvas.get(self.id), self.canvas.history(self.id), self.canvas.selection(self.id))
+        candidate = copy.deepcopy(self.doc)
+        candidate['background'] = '#f2efe7'
+        candidate['layers'][0]['x'] = 30
+        result = Image.open(io.BytesIO(self.canvas.preview(self.id, 1, candidate))).convert('RGBA')
+        self.assertEqual(result.size, (160, 120))
+        self.assertEqual(result.getpixel((159,119)), (242,239,231,255))
+        self.assertNotEqual(result.getpixel((40,20)), (242,239,231,255))
+        self.assertEqual((self.canvas.get(self.id), self.canvas.history(self.id), self.canvas.selection(self.id)), before)
+        with self.assertRaises(Conflict):
+            self.canvas.preview(self.id, 0, candidate)
+        foreign = self.canvas.create('另一个项目')
+        with self.assertRaises(ValueError):
+            self.canvas.preview(foreign['id'], 0, candidate)
+        candidate['width'] = float('nan')
+        with self.assertRaises(ValueError):
+            self.canvas.preview(self.id, 1, candidate)
 
     def test_history_branch_drops_redo_and_old_selection(self):
         self.select()
@@ -231,11 +300,15 @@ class CanvasTests(unittest.TestCase):
         self.canvas.save(self.id, 1, doc)
         with patch(
             "miniclaw_web.canvas.edit_image",
-            return_value=(png(Image.new("RGBA", (64, 64), "red")), "fixture"),
-        ):
+            return_value=(png(Image.new("RGBA", (64, 64), "red")), "fixture", {'model':'qwen-image-edit-max','provider_region':'中国内地','usage':{'image_count':1}}),
+        ) as provider:
             self.held.run()
+            self.assertEqual(provider.call_args.kwargs['model'], job['model'])
         completed = self.canvas.jobs(self.id)[0]
         self.assertEqual(completed["state"], "succeeded")
+        self.assertIs(completed['region'], True)  # Selection scope is not provider geography.
+        self.assertEqual(completed['audit']['region'], '中国内地')
+        self.assertEqual(completed['audit']['estimate_cny'], .5)
         self.assertEqual(self.canvas.get(self.id)["document"], doc)
         image = Image.open(
             self.canvas.asset(self.id, completed["output"]["id"])["path"]

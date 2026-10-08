@@ -4,7 +4,7 @@ import type { ChatController } from './chat-controller';
 import type { ChatState, SessionRow } from './types';
 import { Icon } from './Icon';
 
-export function SidebarSessions({ controller, chat, onSelect }: { controller: ChatController; chat: ChatState; onSelect: () => void }) {
+export function SidebarSessions({ controller, chat, onSelect, projectName }: { controller: ChatController; chat: ChatState; onSelect: () => void; projectName?: string }) {
   const [query, setQuery] = useState('');
   const [rows, setRows] = useState<SessionRow[]>([]);
   const [limit, setLimit] = useState(20);
@@ -61,10 +61,10 @@ export function SidebarSessions({ controller, chat, onSelect }: { controller: Ch
   }
   return <>
     <label className="sidebar-search"><Icon name="search" size={17} /><input name="session-search" autoComplete="off" aria-label="搜索对话" value={query} placeholder="搜索对话" onChange={event => { setQuery(event.target.value); setEditing(''); }} />{query && <button aria-label="清除搜索" onClick={() => setQuery('')}><Icon name="close" size={14} /></button>}</label>
-    <div className="section-label session-scope">{query ? '搜索结果' : archived ? '已归档' : '最近对话'}{loading && <span> · 查找中</span>}<button disabled={saving} aria-pressed={archived} onClick={() => { setArchived(v => !v); setEditing(''); setLimit(20); }}>{archived ? '返回最近' : '归档记录'}</button></div>
+    <div className="section-label session-scope">{query ? '搜索结果' : archived ? '已归档' : projectName ? '全部对话' : '最近对话'}{loading && <span> · 查找中</span>}<button disabled={saving} aria-pressed={archived} onClick={() => { setArchived(v => !v); setEditing(''); setLimit(20); }}>{archived ? '返回最近' : '归档记录'}</button></div>
     <nav className="session-list" aria-label="历史对话">
       {error && <p className="sidebar-error" role="alert">{error}</p>}
-      {rows.map(row => <div className={`session-row ${row.id === chat.storedId ? 'selected' : ''}`} key={row.id}>
+      {rows.map(row => <div className={`session-row ${row.id === (chat.openingId || chat.storedId) ? 'selected' : ''}`} key={row.id}>
         {editing === row.id ? <form className="rename-form" onSubmit={event => { event.preventDefault(); void rename(row); }}>
           <input name="session-title" autoComplete="off" aria-label="对话名称" autoFocus maxLength={200} value={name} onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') setEditing(''); }} />
           <button aria-label="保存对话名称" disabled={blocked || !name.trim()}><Icon name="check" size={16} /></button><button type="button" aria-label="取消改名" onClick={() => setEditing('')}><Icon name="close" size={16} /></button>

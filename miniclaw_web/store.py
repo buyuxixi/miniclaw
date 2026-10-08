@@ -21,10 +21,17 @@ class Store:
                 CREATE TABLE IF NOT EXISTS bindings (name TEXT PRIMARY KEY, data TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS image_jobs (id TEXT PRIMARY KEY, owner TEXT NOT NULL, data TEXT NOT NULL);
             ''')
+        from .media_storage import MediaStorage, migrate_schema
+        from .media_versions import MediaVersions
+        with self.connect() as db:
+            migrate_schema(db)
+        self.media = MediaStorage(self)
+        self.versions = MediaVersions(self)
 
     @contextmanager
     def connect(self):
         db = sqlite3.connect(self.home / 'miniclaw.sqlite3', timeout=10)
+        db.execute('PRAGMA foreign_keys=ON')
         try:
             with db:
                 yield db
@@ -35,11 +42,17 @@ class Store:
         if table not in ('attachments', 'turns', 'bindings', 'image_jobs'):
             raise ValueError('Unknown table')
         column = 'row_id' if table == 'turns' else 'name' if table == 'bindings' else 'id'
+        if table == 'attachments' and data.get('path') and not data.get('object_id'):
+            obj = self.media.put_file(data['path'], data.get('mime','application/octet-stream'))
+            data = {**data, 'object_id':obj['id']}
         with self.connect() as db:
             if table == 'bindings':
                 db.execute(f'INSERT OR REPLACE INTO {table} ({column}, data) VALUES (?, ?)', (key, json.dumps(data, ensure_ascii=False)))
             else:
                 db.execute(f'INSERT OR REPLACE INTO {table} ({column}, owner, data) VALUES (?, ?, ?)', (key, owner, json.dumps(data, ensure_ascii=False)))
+                if table == 'attachments' and data.get('object_id'):
+                    self.versions.append(db,owner,str(key),data.get('kind','file'),
+                        {'object_id':data['object_id'],'name':data.get('name','')},'保存文件',[data['object_id']])
 
     def get(self, table, key, owner=None):
         if table not in ('attachments', 'turns', 'bindings', 'image_jobs'):
@@ -49,7 +62,10 @@ class Store:
             row = db.execute(f'SELECT data FROM {table} WHERE {column}=?' + (' AND owner=?' if owner is not None else ''), (key, owner) if owner is not None else (key,)).fetchone()
         if row is None:
             raise ValueError('记录不存在或不属于当前对话')
-        return json.loads(row[0])
+        record = json.loads(row[0])
+        if table == 'attachments' and record.get('object_id'):
+            record['path'] = str(self.media.materialize(record['object_id']))
+        return record
 
     def turns(self, owner):
         with self.connect() as db:

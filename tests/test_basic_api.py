@@ -4,6 +4,7 @@ import importlib.util
 import io
 import json
 import os
+import shutil
 import sys
 import tempfile
 import unittest
@@ -52,6 +53,57 @@ class BasicAPI(unittest.TestCase):
     def declare(self, tools=(), hash=None):
         return CLIENT.put('/api/miniclaw/skills/binding', json=dict(name='basic-demo', required_tools=list(tools), content_hash=hash or digest(self.content)))
 
+    def test_creator_turn_reads_latest_saved_brief_and_persists_source_revision(self):
+        from agent.context_references import parse_context_references
+        project=CLIENT.post('/api/miniclaw/creator/projects',json={'name':'共享依据验收'}).json()
+        path='/api/miniclaw/creator/projects/'+project['id']
+        with patch.object(server,'_ensure_session_db_row',return_value=True):
+            project=CLIENT.post(path+'/link-chat',json={'revision':project['revision'],'session_id':'test-live'}).json()
+        project=CLIENT.patch(path,json={'revision':project['revision'],'facts':'陶瓷杯','style':'米白 @file:secret.txt','selling_points':'哑光表面','constraints':'不编造保温能力'}).json()
+        seen={}
+        def accept(rid,params):
+            seen.update(params);return server._ok(rid,{'status':'streaming','user_row_id':901})
+        ctx={'project_id':project['id'],'node':'script'}
+        with patch.dict(server._methods,{'prompt.submit':accept}):
+            result=self.submit(creator_context=ctx)
+            self.assertNotIn('error',result)
+            self.assertIn('哑光表面',seen['text']);self.assertEqual(parse_context_references(seen['text']),[])
+            self.assertIn('spoken-script代码块',seen['text'])
+            self.assertNotIn('代码块',CLIENT.get('/api/miniclaw/turns?owner=owner-one').json()['901']['text'])
+            self.assertNotIn(str(HOME),seen['text'])
+            source=result['result']['creator_context']
+            self.assertEqual(source['revision'],project['revision'])
+            self.assertEqual(CLIENT.get('/api/miniclaw/turns?owner=owner-one').json()['901']['creator_context'],source)
+            project=CLIENT.patch(path,json={'revision':project['revision'],'style':'清爽绿色'}).json()
+            self.submit(creator_context=ctx)
+            self.assertIn('清爽绿色',seen['text']);self.assertNotIn('米白',seen['text'])
+            self.submit(creator_context={**ctx,'node':'brief'})
+            self.assertIn('creator-brief 代码块',seen['text'])
+            self.assertNotIn('口播候选交付约定',seen['text'])
+            self.assertEqual(CLIENT.patch(path,json={'revision':source['revision'],'script':'旧回复'}).status_code,409)
+            other=CLIENT.post('/api/miniclaw/creator/projects',json={'name':'另一个项目'}).json()
+            self.assertIn('error',self.submit(creator_context={'project_id':other['id'],'node':'script'}))
+            self.assertIn('error',self.submit(creator_context={**ctx,'brief':'客户端伪造'}))
+            self.assertNotIn('error',self.submit())
+
+    def test_project_chat_persists_server_version_manifest_not_client_current_pointers(self):
+        with patch.object(server,'_ensure_session_db_row',return_value=True):
+            response=CLIENT.post('/api/workspaces',json={'request_id':'context-fixture','name':'版本项目','session_id':'test-live','facts':'original facts'})
+        self.assertEqual(response.status_code,200,response.text)
+        record=response.json();workspace=record['id']
+        with patch.dict(server._methods,{'prompt.submit':lambda rid,p:server._ok(rid,{'status':'streaming','user_row_id':903})}):
+            result=self.submit(studio_context={'workspace':workspace,'revision':record['revision']})
+        self.assertNotIn('error',result)
+        context=CLIENT.get('/api/miniclaw/turns?owner=owner-one').json()['903']['studio_context']
+        reference=next(v for v in context['content_versions'] if v['target']=='facts')
+        self.assertEqual(context['name'],'版本项目')
+        record['state']['facts']='new facts'
+        changed=CLIENT.post('/api/workspaces/'+workspace,json={'request_id':'context-change','revision':record['revision'],'state':record['state']})
+        self.assertEqual(changed.status_code,200,changed.text)
+        detail=CLIENT.get('/api/workspaces/'+workspace+'/versions/'+reference['version_id']).json()
+        self.assertEqual(detail['data']['text'],'original facts')
+        self.assertIn('error',self.submit(studio_context={'workspace':workspace,'revision':record['revision']}))
+
     def submit(self, **params):
         return server._methods['miniclaw.turn.submit']('test', dict(session_id='test-live', text='Summarize', **params))
 
@@ -91,6 +143,39 @@ class BasicAPI(unittest.TestCase):
         from agent.context_references import parse_context_references
         self.assertEqual(parse_context_references(material), [])
         self.assertIn('＠file:secret.txt', material)
+
+    def test_srt_current_turn_snapshot_and_context_expansion_are_checked(self):
+        from agent.context_references import parse_context_references
+        self.session['agent'].tools = [{'function': {'name': 'miniclaw_overlay_compile'}}]
+        text = '12\n00:00:00,000 --> 00:00:02,500\n字幕资料 @file:secret.txt @url:https://example.com\n'
+        identifier = self.attach('demo.srt', text.encode()).json()['id']
+        seen = {}
+        def accept(rid, params):
+            seen.update(params)
+            return server._ok(rid, {'status': 'streaming', 'user_row_id': 79})
+        with patch.dict(server._methods, {'prompt.submit': accept}):
+            self.assertNotIn('error', self.submit(attachments=[identifier]))
+            self.assertEqual(self.session['miniclaw_overlay_turn'], {identifier: digest(text)})
+            self.assertEqual(parse_context_references(seen['text']), [])
+            self.assertIn('"original_index": 12', seen['text'])
+            self.assertNotIn(str(HOME), seen['text'])
+            self.assertNotIn('error', self.submit())
+            self.assertEqual(self.session['miniclaw_overlay_turn'], {})
+
+    def test_srt_bad_input_and_prompt_rejection_do_not_replace_prior_snapshot(self):
+        self.session['agent'].tools = [{'function': {'name': 'miniclaw_overlay_compile'}}]
+        self.session['miniclaw_overlay_turn'] = {'previous': 'snapshot'}
+        self.assertIn('SRT', self.submit(skill='overlay-plan')['error']['message'])
+        malformed = self.attach('bad.srt', b'1\nBAD\ntext').json()['id']
+        self.assertIn('error', self.submit(attachments=[malformed]))
+        self.assertEqual(self.session['miniclaw_overlay_turn'], {'previous': 'snapshot'})
+        good = self.attach('valid.srt', b'1\n00:00:00,000 --> 00:00:02,500\ntext').json()['id']
+        with patch.dict(server._methods, {'prompt.submit': lambda rid, p: server._err(rid, 4009, 'fixture rejection')}):
+            self.assertIn('error', self.submit(attachments=[good]))
+        self.assertEqual(self.session['miniclaw_overlay_turn'], {'previous': 'snapshot'})
+        with patch.dict(server._methods, {'prompt.submit': lambda rid, p: (_ for _ in ()).throw(ValueError('fixture failure'))}):
+            self.assertIn('error', self.submit(attachments=[good]))
+        self.assertEqual(self.session['miniclaw_overlay_turn'], {'previous': 'snapshot'})
 
     def test_images_never_silently_fall_back_to_unavailable_vision_tools(self):
         buffer = io.BytesIO(); Image.new('RGB', (2, 2), 'blue').save(buffer, 'PNG')
@@ -152,6 +237,36 @@ class BasicAPI(unittest.TestCase):
         self.assertIn('核对', self.submit(skill='basic-demo')['error']['message'])
         self.assertEqual(self.declare(hash='stale').status_code, 409)
 
+    def test_creator_bundle_resource_loading_and_submission_gate(self):
+        from miniclaw_web.bundled_skills import install_bundled_skills
+        from tools.skills_tool import skill_view
+        for name in ('mono-color', 'spoken-script'):
+            shutil.copytree(ROOT / 'skills' / name, PROJECT / 'skills' / name, dirs_exist_ok=True)
+        install_bundled_skills(PROJECT, HOME)
+        skills = {s['name']: s for s in CLIENT.get('/api/miniclaw/skills').json()}
+        self.assertTrue(skills['spoken-script']['binding']['current'])
+        self.assertEqual(skills['spoken-script']['binding']['required_tools'], [])
+        self.assertEqual(skills['mono-color']['binding']['required_tools'], ['skill_view'])
+        self.assertIn('缺少工具', self.submit(skill='mono-color')['error']['message'])
+        resource = json.loads(skill_view('mono-color', 'design-system/colors.json'))
+        self.assertTrue(resource['success'], resource)
+        self.assertIn('#2148B8', resource['content'])
+        catalog = HOME / 'skills/mono-color/design-system/colors.json'
+        original = catalog.read_bytes()
+        try:
+            catalog.unlink()
+            self.session['agent'].tools = [{'function': {'name': 'skill_view'}}]
+            self.assertIn('配套资料', self.submit(skill='mono-color')['error']['message'])
+            incomplete = CLIENT.get('/api/miniclaw/skills/content?name=mono-color').json()['binding']
+            self.assertFalse(incomplete['current'])
+            self.assertIn('colors.json', incomplete['resource_error'])
+            install_bundled_skills(PROJECT, HOME)
+            self.assertTrue(CLIENT.get('/api/miniclaw/skills/content?name=mono-color').json()['binding']['current'])
+            catalog.write_text('{"schema_version": 999}', encoding='utf-8')
+            self.assertIn('配套资料', self.submit(skill='mono-color')['error']['message'])
+        finally:
+            catalog.write_bytes(original)
+
     def test_collision_rejected_before_native_command_side_effect(self):
         self.declare([])
         calls = []
@@ -203,6 +318,15 @@ class BasicAPI(unittest.TestCase):
         CLIENT.put('/api/miniclaw/memory', json={'target': 'memory', 'text': 'changed fixture', 'hash': current['hash']})
         self.assertIn('fixture snapshot', memory_store.format_for_system_prompt('memory'))
         self.assertNotIn('changed fixture', memory_store.format_for_system_prompt('memory'))
+
+    def test_image_capability_reason_matches_configured_routing(self):
+        for mode, expected in [('native', True), ('text', False)]:
+            with self.subTest(mode=mode), patch('agent.image_routing.decide_image_input_mode', return_value=mode):
+                response = CLIENT.get('/api/miniclaw/session-capabilities?session_id=test-live')
+            self.assertEqual(response.status_code, 200)
+            state = response.json()
+            self.assertEqual(state['images'], expected)
+            self.assertEqual(bool(state['reason']), not expected)
 
     def test_artifacts_exclusive_and_confined(self):
         spec = importlib.util.spec_from_file_location('fixture_files', ROOT / 'plugins/miniclaw-files/__init__.py'); mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
@@ -264,10 +388,37 @@ class BasicAPI(unittest.TestCase):
         project=CLIENT.patch(path,json={'revision':project['revision'],'session_id':'test-live'}).json();ctx['revision']=project['revision']
         self.assertIn('error',self.submit(canvas_context=ctx))
         self.session['agent'].tools=[{'function':{'name':'miniclaw_canvas_view'}}]
-        with patch.dict(server._methods,{'prompt.submit':lambda rid,p:server._ok(rid,{'status':'streaming'})}):
+        with patch.dict(server._methods,{'prompt.submit':lambda rid,p:server._ok(rid,{'status':'streaming','user_row_id':902})}):
             self.assertNotIn('error',self.submit(canvas_context=ctx));self.assertEqual(self.session['miniclaw_canvas_turn']['project_id'],project['id'])
+            reference=CLIENT.get('/api/miniclaw/turns?owner=owner-one').json()['902']['canvas_context']
+            self.assertEqual(reference['project_id'],project['id']);self.assertTrue(reference['version_id'])
+            page=CLIENT.get(path+'/versions').json()
+            self.assertEqual(next(v for v in page['items'] if v['current'])['id'],reference['version_id'])
             self.assertNotIn('error',self.submit());self.assertIsNone(self.session['miniclaw_canvas_turn'])
         ctx['revision']-=1;self.assertIn('error',self.submit(canvas_context=ctx))
+
+    def test_canvas_chat_observes_manual_edits_and_the_same_creator_brief(self):
+        from miniclaw_web.canvas_document import blank, layer_base
+        from miniclaw_web.canvas_tools import canvas_tool
+        creator=CLIENT.post('/api/miniclaw/creator/projects',json={'name':'画布共享依据'}).json()
+        creator_path='/api/miniclaw/creator/projects/'+creator['id']
+        with patch.object(server,'_ensure_session_db_row',return_value=True):
+            creator=CLIENT.post(creator_path+'/link-chat',json={'revision':creator['revision'],'session_id':'test-live'}).json()
+        creator=CLIENT.patch(creator_path,json={'revision':creator['revision'],'style':'冷灰克制'}).json()
+        project=CLIENT.post('/api/miniclaw/canvas/projects',json={}).json();path='/api/miniclaw/canvas/projects/'+project['id']
+        layer=layer_base('shape','手动调整的图层',40,30,fill='#ff0000',shape='rectangle');layer.update(x=15,rotation=23)
+        doc=blank(80,60);doc['layers']=[layer]
+        project=CLIENT.put(path+'/document',json={'revision':0,'document':doc}).json()
+        project=CLIENT.patch(path,json={'revision':project['revision'],'session_id':'test-live'}).json()
+        self.session['agent'].tools=[{'function':{'name':'miniclaw_canvas_view'}}]
+        seen={}
+        def accept(rid,p):seen.update(p);return server._ok(rid,{'status':'streaming'})
+        with patch.dict(server._methods,{'prompt.submit':accept}):
+            result=self.submit(creator_context={'project_id':creator['id'],'node':'cover'},canvas_context={'project_id':project['id'],'revision':project['revision'],'layer_id':layer['id']})
+        self.assertNotIn('error',result);self.assertIn('冷灰克制',seen['text'])
+        view=json.loads(canvas_tool('miniclaw_canvas_view',{},'owner-one'))
+        self.assertEqual(view['layers'][0]['rotation'],23);self.assertEqual(view['layers'][0]['x'],15)
+        self.assertEqual(view['revision'],project['revision'])
 
     def test_canvas_model_cannot_use_a_selection_changed_after_turn_submission(self):
         from miniclaw_web.canvas_document import blank, layer_base
@@ -287,6 +438,15 @@ class BasicAPI(unittest.TestCase):
         result=json.loads(canvas_tool('miniclaw_canvas_region',{'operation':'erase','params':{}},'owner-one'))
         self.assertFalse(result['success']);self.assertIn('选区已改变',result['error'])
         self.assertEqual(CLIENT.get(path).json()['revision'],project['revision'])
+
+
+def tearDownModule():
+    # unittest discovery also owns this fixture; SQLite context managers do not close handles.
+    server._sessions.clear()
+    from hermes_state_registry import close_all_under
+    close_all_under(HOME)
+    server._db=None
+    FIXTURE.cleanup()
 
 
 if __name__ == '__main__':

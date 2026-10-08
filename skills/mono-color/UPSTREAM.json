@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/yanliudesign/mono-color-skill",
+  "commit": "c8ff70597ddedcd65f21a0b528f6a70c35690b0a",
+  "license": "MIT",
+  "upstream_skill_sha256": "8274BC1F30A92A9DC715C03C3FB9AEAA060FB5A12FD58DFE8D977AE98A26BD76",
+  "adaptation": "Miniclaw prompt-only wrapper and design-guide summary; original catalog JSON retained; no example or reference images included"
+}

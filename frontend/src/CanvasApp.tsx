@@ -1,14 +1,22 @@
 import { useEffect, useRef, useState } from "react";
+import { ActionMenu } from './ActionMenu';
+import {Icon, type IconName} from './Icon';
 import type { ChatController } from "./chat-controller";
 import { Message } from "./Message";
 import { ImageComparison } from "./ImageJobCard";
+import { CandidateReview } from './CandidateReview';
+import { ImagePlanPanel } from './ImagePlanPanel';
+import { GenerationPrice } from './GenerationPrice';
+import { CropReview, cropDocument, type CropCandidate } from './CropReview';
 import { readApi, writeApi } from "./management-api";
 import type { Attachment } from "./attachments";
+import type { CreatorTarget, CreatorTurn } from "./creator-api";
 import { CanvasStage, type CanvasTool, type View } from "./CanvasStage";
 import {
   copyDoc,
   downloadCanvas,
   exportBlob,
+  previewBlob,
   loadProject,
   makeLayer,
   projectOwner,
@@ -23,17 +31,37 @@ import {
   type ProjectRow,
   type Selection,
   type Version,
+  type ContentVersion,
 } from "./canvas-api";
 import "./canvas.css";
+import { photoLayout, photoPresets, photographyPrompt, type PhotoPreset } from './photo-design';
 
-const tools: { id: CanvasTool; icon: string; label: string }[] = [
-  { id: "move", icon: "↖", label: "选择与变换" },
-  { id: "pan", icon: "✥", label: "平移画布" },
-  { id: "rectangle", icon: "▧", label: "矩形选区" },
-  { id: "lasso", icon: "◌", label: "套索选区" },
-  { id: "brush", icon: "⌁", label: "笔刷选区" },
-  { id: "sam", icon: "✦", label: "点选物体" },
-  { id: "crop", icon: "⌗", label: "裁剪画布" },
+type LayoutCandidate = { project: string; revision: number; document: CanvasDocument; before: Blob; after: Blob };
+function LayoutReview({ candidate, busy, onClose, onApply }: { candidate: LayoutCandidate; busy: boolean; onClose: () => void; onApply: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [urls, setUrls] = useState<string[]>([]);
+  useEffect(() => {
+    if (typeof dialog.current?.showModal === 'function') dialog.current.showModal();
+    else dialog.current?.setAttribute('open', '');
+    const links = [candidate.before, candidate.after].map(URL.createObjectURL);
+    setUrls(links); return () => links.forEach(URL.revokeObjectURL);
+  }, [candidate]);
+  return <dialog className="canvas-compare photo-layout-review" aria-label="构图预览" ref={dialog} onCancel={onClose}>
+    <header><strong>先比较，再应用</strong><button disabled={busy} onClick={onClose}>放弃方案</button></header>
+    <p>1080 × 1350 · 4:5。保留完整照片，只调整构图；应用后标题、图片和线条都可编辑，也可撤销。</p>
+    <div>{urls.map((url, i) => <figure key={url}><img src={url} alt={i ? '构图候选' : '原画面'} /><figcaption>{i ? '构图候选' : '原画面'}</figcaption></figure>)}</div>
+    <button className="canvas-primary" disabled={busy} onClick={onApply}>应用构图到画布</button>
+  </dialog>;
+}
+
+const tools: { id: CanvasTool; icon: IconName; label: string }[] = [
+  { id: "move", icon: "select", label: "选择与变换" },
+  { id: "pan", icon: "hand", label: "平移画布" },
+  { id: "rectangle", icon: "rectangle", label: "矩形选区" },
+  { id: "lasso", icon: "lasso", label: "套索选区" },
+  { id: "brush", icon: "brush", label: "笔刷选区" },
+  { id: "sam", icon: "generate", label: "点选物体" },
+  { id: "crop", icon: "crop", label: "裁剪画布" },
 ];
 const failures = (reason: unknown) =>
   reason instanceof Error ? reason.message : String(reason);
@@ -44,7 +72,7 @@ function ProjectCompare({
   onClose,
 }: {
   project: string;
-  seq: number;
+  seq: number | string;
   onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -71,7 +99,7 @@ function ProjectCompare({
   return (
     <dialog className="canvas-compare" ref={dialog} onCancel={onClose}>
       <header>
-        <strong>版本 {seq} 与当前画布</strong>
+        <strong>历史版本与当前画布</strong>
         <button onClick={onClose} aria-label="关闭对比">
           ×
         </button>
@@ -97,16 +125,30 @@ export default function CanvasApp({
   controller,
   onChat,
   onUse,
+  onUseCreator,
+  onBackToCreator,
+  creatorName,
+  creatorContext,
+  onCreatorTurn,
+  onProjectReady,
   initialImport,
   onSettings,
   active,
+  workspaceHost,
 }: {
   controller: ChatController;
   onChat: () => void;
   onUse: (attachment: Attachment) => void;
+  onUseCreator?: (attachment: Attachment) => void;
+  onBackToCreator?: () => void;
+  creatorName?: string;
+  creatorContext?: CreatorTarget;
+  onCreatorTurn?: (source: CreatorTurn) => void;
   onSettings: () => void;
-  initialImport?: { attachment: Attachment; session: string; nonce: number };
+  initialImport?: import('./canvas-api').CanvasImport;
+  onProjectReady?: (origin: import('./creator-canvas').CreatorCanvasOrigin, canvas: string) => void;
   active: boolean;
+  workspaceHost?: { project: string; name?: string; context?: string; onClose: () => void; onReview: (project: string, revision: number) => Promise<void> };
 }) {
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [archived, setArchived] = useState(false);
@@ -115,8 +157,17 @@ export default function CanvasApp({
   const [assets, setAssets] = useState<CanvasAsset[]>([]);
   const [selection, setSelection] = useState<Selection | null>(null);
   const [history, setHistory] = useState<Version[]>([]);
+  const [versions, setVersions] = useState<ContentVersion[]>([]);
+  const [versionTotal, setVersionTotal] = useState(0);
+  const [versionPage, setVersionPage] = useState(1);
   const [jobs, setJobs] = useState<CanvasJob[]>([]);
   const [capabilities, setCapabilities] = useState<CanvasCapabilities>();
+  const [imageModel, setImageModel] = useState('');
+  useEffect(() => {
+    if (!project?.id) return;
+    setImageModel(localStorage.getItem('canvas-image-model:'+project.id) || new URLSearchParams(location.search).get('model') || '');
+  }, [project?.id]);
+  const editModel = capabilities?.image_models?.find(m=>m.model===(imageModel||capabilities.cloud.model)) || capabilities?.image_models?.find(m=>m.configured);
   const [selected, setSelected] = useState("");
   const [tool, setTool] = useState<CanvasTool>("move");
   const [view, setView] = useState<View>({ x: 30, y: 30, scale: 0.5 });
@@ -125,25 +176,33 @@ export default function CanvasApp({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [name, setName] = useState("");
-  const [panel, setPanel] = useState<"layers" | "history" | "assistant">(
-    "layers",
+  const [panel, setPanel] = useState<"layers" | "history" | "assistant" | "design">(
+    "assistant",
   );
+  const [precision, setPrecision] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const [combine, setCombine] = useState("replace");
   const [radius, setRadius] = useState(20);
   const [brightness, setBrightness] = useState(0.15);
-  const [prompt, setPrompt] = useState("");
+  const [prompt, setPrompt] = useState(photographyPrompt);
   const [region, setRegion] = useState(true);
   const [feather, setFeather] = useState(0);
   const [assistant, setAssistant] = useState("");
   const [cropRatio, setCropRatio] = useState("free");
-  const [compare, setCompare] = useState<number>();
+  const [compare, setCompare] = useState<number | string>();
+  const [photoPreset, setPhotoPreset] = useState<PhotoPreset>('paper');
+  const [designMode, setDesignMode] = useState<'layout' | 'photo'>(workspaceHost ? 'photo' : 'layout');
+  const [designTitle, setDesignTitle] = useState('留白之间');
+  const [designSubtitle, setDesignSubtitle] = useState('细看轮廓与配色');
+  const [layoutCandidate, setLayoutCandidate] = useState<LayoutCandidate>();
+  const [cropCandidate, setCropCandidate] = useState<CropCandidate>();
   const [size, setSize] = useState({ width: 800, height: 600 });
   const host = useRef<HTMLDivElement>(null);
   const upload = useRef<HTMLInputElement>(null);
   const importNonce = useRef<number | undefined>(undefined);
   const activeId = useRef("");
   const lastName = useRef("");
+  const lastDesign = useRef("");
   const [, renderChat] = useState(0);
   useEffect(
     () => controller.subscribe(() => renderChat((n) => n + 1)),
@@ -157,6 +216,7 @@ export default function CanvasApp({
   const canAssist = Object.values(chat.info.tools ?? {})
     .flat()
     .includes("miniclaw_canvas_view");
+  const canPropose = Object.values(chat.info.tools ?? {}).flat().includes('miniclaw_canvas_propose');
   const activeJob = jobs.find(
     (j) => j.state === "running" || j.state === "queued",
   );
@@ -184,6 +244,14 @@ export default function CanvasApp({
         ? before
         : state.project,
     );
+    if (lastDesign.current !== id) {
+      lastDesign.current = id;
+      const layers = state.project.document.layers;
+      setDesignTitle(layers.find(l => l.kind === 'text' && l.name === '标题')?.text || '留白之间');
+      setDesignSubtitle(layers.find(l => l.kind === 'text' && l.name === '说明')?.text || '细看轮廓与配色');
+      setLayoutCandidate(undefined);
+      setCropCandidate(undefined);
+    }
     if (lastName.current !== state.project.id + state.project.name) {
       lastName.current = state.project.id + state.project.name;
       setName(state.project.name);
@@ -191,12 +259,16 @@ export default function CanvasApp({
     setAssets(state.assets);
     setSelection(state.selection);
     setHistory(state.history);
+    setVersions(state.versions);
+    setVersionTotal(state.versionTotal ?? state.versions.length);
+    setVersionPage(1);
     setJobs(state.jobs);
     setSelected((before) =>
       state.project.document.layers.some((l) => l.id === before)
         ? before
-        : (state.project.document.layers.at(-1)?.id ?? ""),
+        : (state.project.document.layers.find(l => l.kind === 'image')?.id ?? state.project.document.layers.at(-1)?.id ?? ""),
     );
+    return state;
   }
   function fit(doc = project?.document) {
     if (!doc) return;
@@ -247,13 +319,25 @@ export default function CanvasApp({
   }, []);
   useEffect(() => {
     if (!initialImport || importNonce.current === initialImport.nonce) return;
+    if (busyRef.current) return;
     importNonce.current = initialImport.nonce;
+    setPrecision(!!initialImport.precision); setDrawer(!!initialImport.precision); setPanel(workspaceHost ? 'design' : initialImport.precision ? 'layers' : 'assistant');
+    if (workspaceHost) { setPrompt(''); setRegion(false); setDrawer(!window.matchMedia('(max-width:700px)').matches); }
+    if (initialImport.design) {
+      setPanel('design'); setDrawer(true); setLayoutCandidate(undefined);
+      setDesignMode(initialImport.design.mode);
+      setPhotoPreset(initialImport.design.preset || 'paper');
+      setPrompt(initialImport.design.brief || photographyPrompt);
+    }
     void run(async () => {
       if (initialImport.attachment.canvas_project_id) {
         const id = initialImport.attachment.canvas_project_id;
         activeId.current = id;
-        await refresh(id);
+        const fresh = await refresh(id);
+        if (!fresh || activeId.current !== id) return;
         localStorage.setItem("miniclaw.canvas.selected", id);
+        setSelected(fresh.project.document.layers.find(l => l.kind === 'image')?.id || '');
+        if (initialImport.creator) onProjectReady?.(initialImport.creator, id);
         return;
       }
       const created = await writeApi<Project>(
@@ -288,10 +372,84 @@ export default function CanvasApp({
         session_id: initialImport.session,
       });
       await refresh(created.id);
+      localStorage.setItem("miniclaw.canvas.selected", created.id);
+      if (initialImport.creator) onProjectReady?.(initialImport.creator, created.id);
       await list();
       fit(doc);
     });
-  }, [initialImport?.nonce]);
+  }, [initialImport?.nonce, busy]);
+  async function designSource(p: Project) {
+    const original = p.document.layers.find(l => l.name === '原画面 · 完整保留' && l.kind === 'image');
+    const existing = original && assets.find(a => a.id === original.asset_id);
+    if (existing) return existing;
+    const blob = await exportBlob(p.id, p.cursor);
+    return uploadCanvas(p.id, new File([blob], '当前画面底图.png', { type: 'image/png' }));
+  }
+  async function prepareLayout() {
+    if (!project) return;
+    const p = project;
+    const before = await exportBlob(p.id, p.cursor);
+    const asset = await designSource(p);
+    const document = photoLayout(asset, photoPreset, designTitle, designSubtitle);
+    const after = await previewBlob(p.id, p.revision, document);
+    if (activeId.current !== p.id) throw new Error('当前项目已切换，请重新生成构图方案。');
+    setLayoutCandidate({ project: p.id, revision: p.revision, document, before, after });
+  }
+  async function prepareScreenshotCrop() {
+    if (!project) return;
+    const p = project;
+    const bounds = await writeApi<{y: number; height: number} | null>(projectPath(p.id) + '/crop-suggestion', 'POST', { revision: p.revision });
+    if (!bounds) { setTool('crop'); setDrawer(false); setNotice('没有找到明显的截图画面区。请在画布拖动框选要保留的范围。'); return; }
+    const document = cropDocument(p.document, bounds.y, bounds.y + bounds.height);
+    const before = await exportBlob(p.id, p.cursor);
+    const after = await previewBlob(p.id, p.revision, document);
+    if (activeId.current !== p.id) throw new Error('项目已切换，请重新预览裁剪。');
+    setCropCandidate({project:p.id, revision:p.revision, original:copyDoc(p.document), document, before, after, top:bounds.y, bottom:bounds.y+bounds.height});
+  }
+  async function updateScreenshotCrop(top: number, bottom: number) {
+    if (!cropCandidate || activeId.current !== cropCandidate.project) throw new Error('裁剪项目已切换。');
+    const c = cropCandidate, document = cropDocument(c.original, top, bottom);
+    const after = await previewBlob(c.project, c.revision, document);
+    if (activeId.current !== c.project) throw new Error('裁剪项目已切换。');
+    setCropCandidate({...c, document, after, top, bottom});
+  }
+  async function applyScreenshotCrop() {
+    if (!cropCandidate || activeId.current !== cropCandidate.project) throw new Error('裁剪项目已切换。');
+    const c = cropCandidate;
+    await writeApi(projectPath(c.project) + '/document', 'PUT', {revision:c.revision, document:c.document, label:'确认截图裁剪范围'});
+    await refresh(c.project); setCropCandidate(undefined); setDrawer(false); setTool('move'); fit(c.document);
+    setNotice('裁剪已应用，原素材和历史保留。再打开“图片方案”制作构图或精修。');
+  }
+  async function applyLayout() {
+    if (!layoutCandidate || activeId.current !== layoutCandidate.project) throw new Error('构图所属项目已切换，请重新预览。');
+    const candidate = layoutCandidate;
+    await writeApi(projectPath(candidate.project) + '/document', 'PUT', { revision: candidate.revision, document: candidate.document, label: '应用展示图构图' });
+    await refresh(candidate.project); setLayoutCandidate(undefined); setDrawer(false); fit(candidate.document);
+    setNotice('构图已应用；核对商品与文字后，点击“采用工作图”回到创作任务。');
+  }
+  async function generatePhotograph() {
+    if (!project || !prompt.trim()) return;
+    const p = project;
+    const asset = await designSource(p);
+    if (activeId.current !== p.id) throw new Error('当前项目已切换，未发起精修。');
+    const layer = makeLayer('image', '摄影精修底图', asset.width, asset.height, { asset_id: asset.id });
+    const document: CanvasDocument = { schema_version: 1, width: asset.width, height: asset.height, background: '#ffffff00', layers: [layer] };
+    const saved = await writeApi<Project>(projectPath(p.id) + '/document', 'PUT', { revision: p.revision, document, label: '准备可见画面的摄影精修底图' });
+    await refresh(p.id); setSelected(layer.id); setRegion(false); fit(document);
+    await writeApi(projectPath(p.id) + '/jobs', 'POST', { revision: saved.revision, layer_id: layer.id, prompt, request_id: crypto.randomUUID(), region: false, feather: 0, model:editModel?.model,provider:editModel?.provider });
+    await refresh(p.id); setPanel('assistant'); setDrawer(true);
+    setNotice('已提交一次摄影精修，结果先作为候选。可见画面底图已记录在历史，不自动重试。');
+  }
+  async function prepareVideoPortrait() {
+    if(!project)return;
+    const p=project,asset=await designSource(p);
+    if(activeId.current!==p.id)throw Error('项目已切换，请重新准备首帧');
+    const scale=Math.min(720/asset.width,1120/asset.height);
+    const layer=makeLayer('image','竖屏首帧底图',asset.width,asset.height,{asset_id:asset.id,x:(720-asset.width*scale)/2,y:(1280-asset.height*scale)/2,scale_x:scale,scale_y:scale});
+    const document:CanvasDocument={schema_version:1,width:720,height:1280,background:'#dce8da',layers:[layer]};
+    await writeApi<Project>(projectPath(p.id)+'/document','PUT',{revision:p.revision,document,label:'准备9:16视频首帧，保留裁剪后像素'});
+    await refresh(p.id);setSelected(layer.id);fit(document);setNotice('已准备竖屏底图。可用摄影精修补齐上下背景；原图与裁剪历史保留。');
+  }
   useEffect(() => {
     if (!host.current) return;
     const observer = new ResizeObserver((entries) => {
@@ -547,15 +705,18 @@ export default function CanvasApp({
     });
     await refresh(project.id);
   }
-  async function useInChat() {
+  async function useInChat(asCover = false) {
     if (!project) return;
+    if (asCover && (creatorContext?.canvas !== project.id || project.chat_id !== creatorContext.owner || creatorContext.owner !== chat.storedId))
+      throw new Error('当前画布与创作项目不匹配，请从项目图片入口继续；未采用');
     if (project.chat_id !== chat.storedId) await link();
     const attachment = await writeApi<Attachment>(
       `${projectPath(project.id)}/send-chat`,
       "POST",
       { session_id: chat.sessionId },
     );
-    onUse(attachment);
+    if (asCover && onUseCreator) onUseCreator(attachment);
+    else onUse(attachment);
   }
   async function prepareAssistant() {
     if (!project || controller.connection !== "open")
@@ -612,12 +773,18 @@ export default function CanvasApp({
         />
       </label>
     );
+  const linkedProject = !!project && creatorContext?.canvas === project.id && project.chat_id === creatorContext.owner;
+  useEffect(() => {
+    if (active && linkedProject && !precision) { setPrecision(true); setPanel('layers'); setDrawer(window.innerWidth>700); }
+  }, [active, linkedProject, precision]);
   return (
-    <section className="canvas-app" aria-label="图片工作区">
+    <section className={`canvas-app ${precision ? "is-precision" : "is-guided"} ${linkedProject?'studio-canvas':''} ${workspaceHost?'workspace-editor':''}`} aria-label="图片工作区">
       <header className="canvas-header">
         <button
           className="canvas-wordmark"
           onClick={() => {
+            if (workspaceHost) { workspaceHost.onClose(); return; }
+            if (linkedProject) { onChat(); return; }
             activeId.current = "";
             setProject(undefined);
             localStorage.removeItem("miniclaw.canvas.selected");
@@ -625,10 +792,11 @@ export default function CanvasApp({
           }}
           disabled={busy}
         >
-          miniclaw <span>/ 图片</span>
+          {workspaceHost ? '← 返回自由画布' : linkedProject ? '← 返回对话' : <>miniclaw <span>/ 图片</span></>}
         </button>
+        {linkedProject && creatorName && <strong className="canvas-product-name">{creatorName} · 手动精调</strong>}
         {project && (
-          <input
+          <input hidden={linkedProject || !!workspaceHost}
             aria-label="项目名称"
             className="canvas-title"
             value={name}
@@ -646,12 +814,16 @@ export default function CanvasApp({
             }}
           />
         )}
+        {workspaceHost && <span className="canvas-source-name">{workspaceHost.name || name.replace(/^视频素材：/,'')}</span>}
         <span className="canvas-saved">
           {busy ? "正在保存…" : project ? "已保存" : "独立图片项目"}
         </span>
-        <button onClick={onChat}>聊天</button>
+        {!linkedProject && !workspaceHost && <button onClick={onChat}>聊天</button>}
+        {workspaceHost && project && <button className="canvas-primary" disabled={busy || project.id !== workspaceHost.project} onClick={() => void run(() => workspaceHost.onReview(project.id, project.revision))}>比较修改</button>}
+        {project&&onUseCreator&&<button className="canvas-primary" disabled={busy||!chat.sessionId||creatorContext?.canvas !== project.id||project.chat_id !== creatorContext?.owner||creatorContext?.owner !== chat.storedId} onClick={()=>void run(()=>useInChat(true))}>采用工作图</button>}
         {project && (
-          <>
+          <ActionMenu className="canvas-more-actions" label="更多">
+            {linkedProject && onBackToCreator && <button onClick={onBackToCreator} disabled={busy}>商品总览</button>}
             <button
               onClick={() =>
                 void run(async () => {
@@ -663,15 +835,16 @@ export default function CanvasApp({
               导出 PNG
             </button>
             <button
-              className="canvas-primary"
-              onClick={() => void run(useInChat)}
+              className="canvas-send-to-chat"
+              onClick={() => void run(()=>useInChat())}
               disabled={busy || !chat.sessionId}
             >
               用于聊天
             </button>
-          </>
+          </ActionMenu>
         )}
       </header>
+      {workspaceHost?.context && <details className="canvas-workspace-context"><summary>项目要求</summary><p>{workspaceHost.context}</p></details>}
       {(error || notice) && (
         <div
           className={`canvas-banner ${error ? "is-error" : ""}`}
@@ -778,22 +951,27 @@ export default function CanvasApp({
       ) : (
         <>
           <div className="canvas-commandbar">
-            <button disabled={busy} onClick={() => upload.current?.click()}>
+            {!linkedProject && !workspaceHost && <button className="canvas-primary" disabled={busy} onClick={() => { setPanel("assistant"); setDrawer(true); setSelected(project.document.layers.find(l => l.kind === "image" && !l.locked)?.id || selected); }}>说说想怎么改</button>}
+            <button disabled={busy || !!activeJob} onClick={() => { setPanel('design'); setDrawer(true); }}><Icon name="generate" size={16}/>图片方案</button>
+            {workspaceHost&&<button disabled={busy||!target||target.kind!=='image'||target.locked} onClick={()=>local('flip',{direction:'horizontal'})}><Icon name="flip" size={16}/>水平翻转</button>}
+            <button hidden={!precision} disabled={busy} onClick={() => upload.current?.click()}>
               ＋ 图片
             </button>
-            <button disabled={busy} onClick={() => addLayer("text")}>
+            {workspaceHost&&precision&&<ActionMenu label="添加图层"><button disabled={busy} onClick={()=>addLayer('text')}>文字</button><button disabled={busy} onClick={()=>addLayer('shape')}>矩形</button><button disabled={busy} onClick={()=>addLayer('shape','ellipse')}>椭圆</button></ActionMenu>}
+            <button hidden={!precision||!!workspaceHost} disabled={busy} onClick={() => addLayer("text")}>
               文字
             </button>
-            <button disabled={busy} onClick={() => addLayer("shape")}>
+            <button hidden={!precision||!!workspaceHost} disabled={busy} onClick={() => addLayer("shape")}>
               矩形
             </button>
             <button
               disabled={busy}
-              onClick={() => addLayer("shape", "ellipse")}
+              hidden={!precision||!!workspaceHost} onClick={() => addLayer("shape", "ellipse")}
             >
               椭圆
             </button>
             <span className="canvas-command-divider" />
+            <div className="canvas-history-actions" role="group" aria-label="撤销与重做">
             <button
               aria-label="撤销"
               disabled={
@@ -801,7 +979,7 @@ export default function CanvasApp({
               }
               onClick={() => restore(project.cursor - 1)}
             >
-              ↶
+              <Icon name="undo" size={17}/>
             </button>
             <button
               aria-label="重做"
@@ -810,13 +988,15 @@ export default function CanvasApp({
               }
               onClick={() => restore(project.cursor + 1)}
             >
-              ↷
+              <Icon name="redo" size={17}/>
             </button>
+            </div>
             <button
               className="canvas-panel-toggle"
-              onClick={() => setDrawer(!drawer)}
+                aria-pressed={linkedProject ? drawer : precision}
+                onClick={() => { if (linkedProject || workspaceHost) { setPanel("layers"); setDrawer(!drawer); return; } setPrecision(!precision); setPanel(precision ? "assistant" : "layers"); if (precision) setTool("move"); setDrawer(true); }}
             >
-              图层与操作
+                {workspaceHost ? "图层与属性" : linkedProject ? "图层与属性" : precision ? "返回简洁编辑" : "精调工具"}
             </button>
             <input
               ref={upload}
@@ -832,7 +1012,7 @@ export default function CanvasApp({
             />
           </div>
           <div className="canvas-editor">
-            <nav className="canvas-tools" aria-label="画布工具">
+            <nav hidden={!precision} className="canvas-tools" aria-label="画布工具">
               {tools.map((t) => (
                 <button
                   key={t.id}
@@ -845,7 +1025,7 @@ export default function CanvasApp({
                   }
                   onClick={() => setTool(t.id)}
                 >
-                  <span>{t.icon}</span>
+                  <Icon name={t.icon} size={20}/>
                   <small>{t.label.slice(0, 2)}</small>
                 </button>
               ))}
@@ -908,17 +1088,18 @@ export default function CanvasApp({
             </div>
             <aside className={`canvas-inspector ${drawer ? "is-open" : ""}`}>
               <div className="canvas-tabs">
-                {(["layers", "history", "assistant"] as const).map((tab) => (
+                {(["assistant", "design", "layers", "history"] as const).map((tab) => (
                   <button
                     key={tab}
+                    hidden={tab === "layers" && !precision || linkedProject && tab==='assistant'}
                     aria-pressed={panel === tab}
-                    onClick={() => setPanel(tab)}
+                    onClick={() => { if (tab === 'assistant' && linkedProject) { onChat(); return; } setPanel(tab); if (tab === "layers") setPrecision(true); }}
                   >
-                    {tab === "layers"
+                    <Icon name={tab==='design'?'generate':tab==='layers'?'layers':tab==='history'?'history':'edit'} size={15}/>{tab === 'design' ? '精修' : tab === "layers"
                       ? "图层"
                       : tab === "history"
                         ? "历史"
-                        : "助手"}
+                        : linkedProject ? "对话" : "修改"}
                   </button>
                 ))}
                 <button
@@ -929,6 +1110,23 @@ export default function CanvasApp({
                   ×
                 </button>
               </div>
+              {panel === 'design' && <div className="canvas-panel-content photo-design-panel">
+                <h3>图片精修</h3>
+                <div className="photo-preset-options"><button aria-pressed={designMode === 'layout'} onClick={() => setDesignMode('layout')}>构图排版</button><button aria-pressed={designMode === 'photo'} onClick={() => setDesignMode('photo')}>摄影精修</button></div>
+                <details className="photo-preparation"><summary>裁剪与画幅</summary><div className="canvas-button-grid"><button disabled={busy || !!activeJob || !project.document.layers.length} onClick={() => void run(prepareScreenshotCrop)}>截图裁剪</button><button disabled={busy || !!activeJob} onClick={() => { setTool('crop'); setDrawer(false); setNotice('拖动选择保留范围。'); }}>手动裁剪</button></div><button disabled={busy||!!activeJob||!project.document.layers.length} onClick={()=>void run(prepareVideoPortrait)}>9:16 首帧</button></details>
+                <div hidden={designMode !== 'layout'}>
+                <div className="photo-preset-options">{photoPresets.map(p => <button key={p.id} aria-pressed={photoPreset === p.id} onClick={() => setPhotoPreset(p.id)}><i style={{ background: p.color, borderColor: p.ink }} /><strong>{p.name}</strong></button>)}</div>
+                <label className="canvas-field">展示图标题<input aria-label="展示图标题" value={designTitle} maxLength={16} onChange={e => setDesignTitle(e.target.value)} /></label>
+                <label className="canvas-field">展示图说明<input aria-label="展示图说明" value={designSubtitle} maxLength={28} onChange={e => setDesignSubtitle(e.target.value)} /></label>
+                <button className="canvas-primary" disabled={busy || !!activeJob || !project.document.layers.length} onClick={() => void run(prepareLayout)}>预览构图 · 不改原图</button>
+                <p className="canvas-hint">本机完成，4:5画册构图。照片完整保留，不假造三维结构。应用后可改文字和布局。</p>
+                </div><div hidden={designMode !== 'photo'}>
+                <label className="canvas-field">修改要求<textarea aria-label="摄影精修要求" placeholder="描述需要调整的光线、背景或质感…" value={prompt} maxLength={2000} onChange={e => setPrompt(e.target.value)} /></label>
+                <GenerationPrice compact cloud={capabilities?.cloud && {...capabilities.cloud, model:editModel?.model||capabilities.cloud.model, reference_cny_per_image:editModel?.model===capabilities.cloud.model?capabilities.cloud.reference_cny_per_image:null}}/><button className="canvas-primary photo-generate" disabled={busy || !!activeJob || !prompt.trim() || !capabilities?.cloud.configured || !project.document.layers.length} onClick={() => void run(generatePhotograph)}>生成候选 · 可能计费</button>
+                {!capabilities?.cloud.configured && <p className="canvas-hint">摄影精修未配置；本机构图仍可用。</p>}
+                <button className="photo-refine-prompt" disabled={busy} onClick={() => { setAssistant('请根据本项目已保存的卖点与风格，帮我优化摄影精修要求。先给建议，不调用生成工具。\n现有要求：' + (prompt || photographyPrompt)); setPanel('assistant'); }}>打磨修改要求</button>
+                </div>
+              </div>}
               {panel === "layers" && (
                 <div className="canvas-panel-content">
                   <div className="canvas-section-heading">
@@ -1308,40 +1506,60 @@ export default function CanvasApp({
               {panel === "history" && (
                 <div className="canvas-panel-content">
                   <p className="canvas-hint">
-                    保存操作形成版本，最多保留最近101个。撤销后继续编辑会建立新分支。
+                    版本持续保留。恢复旧版后继续编辑，会保留原分支；快捷撤销另保留最近101步。
                   </p>
-                  {history.map((v) => (
+                  {versions.map((v) => (
                     <div
                       className={`canvas-version ${v.current ? "current" : ""}`}
-                      key={v.seq}
+                      key={v.id}
                     >
                       <strong>{v.label}</strong>
                       <span>
-                        版本 {v.seq} ·{" "}
+                        {v.parent_id ? "修改版本" : "初始版本"} ·{" "}
                         {new Date(v.time * 1000).toLocaleTimeString()}
                       </span>
                       <div>
                         <button
                           disabled={busy || v.current}
-                          onClick={() => restore(v.seq)}
+                          onClick={() => { void run(async () => { await writeApi(`${projectPath(project.id)}/versions/restore`, "POST", {revision:project.revision,version_id:v.id}); await refresh(project.id); }); }}
                         >
                           {v.current ? "当前" : "恢复"}
                         </button>
-                        <button onClick={() => setCompare(v.seq)}>对比</button>
+                        <button onClick={() => setCompare(v.id)}>对比</button>
                       </div>
                     </div>
                   ))}
+                  {versions.length < versionTotal && <button disabled={busy} onClick={() => {void run(async () => {
+                    const page = await readApi<{items:ContentVersion[];total:number;page:number}>(`${projectPath(project.id)}/versions?page=${versionPage+1}`);
+                    setVersions(previous => [...previous, ...page.items.filter(v => !previous.some(old => old.id === v.id))]);
+                    setVersionTotal(page.total);
+                    setVersionPage(page.page);
+                  });}}>加载更多版本</button>}
                 </div>
               )}
-              {panel === "assistant" && (
+              {panel === "assistant" && !linkedProject && (
                 <div className="canvas-panel-content">
+                  {!workspaceHost && <ImagePlanPanel key={project.id} project={project} busy={busy || chat.running} activeJob={!!activeJob}
+                    canPlan={project.chat_id === chat.storedId && canPropose}
+                    hasTarget={!!target} targetLayerId={target?.kind === "image" ? target.id : undefined} hasSubjectSelection={selection?.layer_id === selected} onRun={run} onRefresh={async () => { await refresh(project.id); }} onSend={async goal => {
+                      const ok = await controller.send(goal,
+                        'canvas-editor', [], { project_id:project.id, revision:project.revision, layer_id:selected, mode:'plan' },
+                        creatorContext?.owner === chat.storedId && creatorContext.canvas === project.id && project.chat_id === chat.storedId ? { project_id:creatorContext.id, node:'cover' } : undefined);
+                      if (ok) {
+                        const source = controller.state.items.slice().reverse().find(item => item.kind === 'user')?.creator_context;
+                        if (source) onCreatorTurn?.(source);
+                      }
+                    }} />}
+                  <details open={workspaceHost ? true : undefined}><summary>{workspaceHost ? '描述这次修改' : '直接填写修图参数'}</summary>
                   <div className="canvas-section-heading">
                     <strong>AI 修图</strong>
                     <span>百炼</span>
                   </div>
+                  <label className="canvas-field">修图模型<select aria-label="选择修图模型" value={editModel?.model||''} onChange={e=>{setImageModel(e.target.value);localStorage.setItem('canvas-image-model:'+project.id,e.target.value)}}>
+                    {capabilities?.image_models?.map(m=><option key={m.model} value={m.model} disabled={!m.configured}>{m.label}{m.configured?'':' · 未配置'}</option>)}
+                  </select></label>
                   <p className="canvas-hint">
-                    {target ? `目标：${target.name}` : "先选择图片图层"}
-                    。结果先生成候选，再比较、采用。
+                    {workspaceHost ? '先生成候选，再比较、采用。' : `${target ? `目标：${target.name}` : '先选择图片图层'}。结果先生成候选，再比较、采用。`}
                   </p>
                   <label className="canvas-field">
                     处理范围
@@ -1357,7 +1575,7 @@ export default function CanvasApp({
                     修图要求
                     <textarea
                       value={prompt}
-                      maxLength={2000}
+                      maxLength={workspaceHost?.context ? Math.max(1,1988-workspaceHost.context.length) : 2000}
                       placeholder="例如：把选中的污点自然去掉，保留背景纹理"
                       onChange={(e) => setPrompt(e.target.value)}
                     />
@@ -1392,10 +1610,12 @@ export default function CanvasApp({
                           {
                             revision: project.revision,
                             layer_id: selected,
-                            prompt,
+                            prompt: workspaceHost?.context ? `${prompt}\n项目共同要求：${workspaceHost.context}` : prompt,
                             request_id: crypto.randomUUID(),
                             region,
                             feather,
+                            model: editModel?.model,
+                            provider: editModel?.provider,
                             selection_id: region ? selection?.id : undefined,
                           },
                         );
@@ -1405,9 +1625,11 @@ export default function CanvasApp({
                   >
                     生成候选 · 可能计费
                   </button>
+                  <GenerationPrice cloud={capabilities?.cloud && {...capabilities.cloud, model:editModel?.model||capabilities.cloud.model, reference_cny_per_image:editModel?.model===capabilities.cloud.model?capabilities.cloud.reference_cny_per_image:null}}/>
+                  </details>
                   {jobs.map((j) => (
-                    <div className="canvas-job" key={j.id}>
-                      <strong>
+                    <details className="canvas-job" key={j.id} open={["running","queued"].includes(j.state) || j.revision === project.revision && j.review?.decision !== "reject"}>
+                      <summary>
                         {j.state === "succeeded"
                           ? "候选已生成"
                           : j.state === "running"
@@ -1417,8 +1639,8 @@ export default function CanvasApp({
                               : j.state === "canceled"
                                 ? "已取消"
                                 : "处理失败"}
-                      </strong>
-                      <p>{j.prompt}</p>
+                      </summary>
+                      <p className="canvas-job-audit">{j.model || "历史任务未记录模型"} · {j.audit?.estimate_cny==null?'参考费用待核对':`参考 ¥${j.audit.estimate_cny.toFixed(2)}`} · 实际扣费待账单核对</p><details><summary>任务编号与修改要求</summary><p>供应商编号：{j.provider_request_id || "未返回"}</p><p>{j.prompt}</p></details>
                       {j.error && <p role="status">{j.error}</p>}
                       {j.output && (
                         <>
@@ -1427,9 +1649,12 @@ export default function CanvasApp({
                             source={assets.find((a) => a.id === j.source_id)!}
                             output={j.output}
                           />
-                          <div className="canvas-button-grid">
+                          <CandidateReview job={j} busy={busy} onReview={(decision, checks, reason) => void run(async () => {
+                            await writeApi(`${projectPath(project.id)}/jobs/${j.id}/review`, 'POST', {revision:project.revision, decision, checks, reason});
+                            await refresh(project.id);
+                          })}>{ready => <div className="canvas-button-grid">
                             <button
-                              disabled={busy || project.revision !== j.revision}
+                              disabled={busy || project.revision !== j.revision || !ready}
                               onClick={() =>
                                 void run(async () => {
                                   await writeApi(
@@ -1444,7 +1669,7 @@ export default function CanvasApp({
                               采用到原层
                             </button>
                             <button
-                              disabled={busy}
+                              disabled={busy || !ready}
                               onClick={() =>
                                 void run(async () => {
                                   const doc = copyDoc(project.document);
@@ -1463,10 +1688,10 @@ export default function CanvasApp({
                             >
                               另加图层
                             </button>
-                          </div>
+                          </div>}</CandidateReview>
                           {project.revision !== j.revision && (
                             <p className="canvas-hint">
-                              画布已更新，候选可作为新图层添加。
+                              {j.review?.decision === 'reject' ? '候选已保留为未采用，不会覆盖当前画布。重新核对后才能采用。' : '画布已更新，先核对商品；通过后可作为新图层添加。'}
                             </p>
                           )}
                         </>
@@ -1488,8 +1713,9 @@ export default function CanvasApp({
                           取消接收
                         </button>
                       )}
-                    </div>
+                    </details>
                   ))}
+                  <details className="canvas-assistant-advanced" hidden={!!workspaceHost}><summary>更多：助手设置与聊天记录</summary>
                   <div className="canvas-section-heading">
                     <strong>修图助手</strong>
                     <span>Hermes</span>
@@ -1513,10 +1739,10 @@ export default function CanvasApp({
                       打开关联聊天
                     </button>
                   )}
-                  {!canAssist && (
+                  {(!canAssist || !canPropose) && (
                     <div>
                       <p className="canvas-hint">
-                        当前聊天未加载画布工具，新聊天才能使用新增能力。
+                        当前聊天未加载新版修图方案工具，新聊天才能使用新增能力。
                       </p>
                       <button
                         disabled={
@@ -1554,9 +1780,13 @@ export default function CanvasApp({
                           project_id: project.id,
                           revision: project.revision,
                           layer_id: selected,
-                        })
+                        }, creatorContext?.owner === chat.storedId && creatorContext.canvas === project.id && project.chat_id === chat.storedId ? { project_id: creatorContext.id, node: 'cover' } : undefined)
                         .then((ok) => {
-                          if (ok) setAssistant("");
+                          if (ok) {
+                            setAssistant("");
+                            const source = controller.state.items.slice().reverse().find(item => item.kind === 'user')?.creator_context;
+                            if (source) onCreatorTurn?.(source);
+                          }
                         });
                     }}
                   >
@@ -1581,9 +1811,10 @@ export default function CanvasApp({
                           />
                         ))}
                   </div>
+                  </details>
                 </div>
               )}
-              <div className="canvas-mobile-use">
+              <div className="canvas-mobile-use" hidden={linkedProject || !!workspaceHost}>
                 <button
                   className="canvas-primary"
                   disabled={busy || !chat.sessionId}
@@ -1597,7 +1828,7 @@ export default function CanvasApp({
           <footer className="canvas-statusbar">
             <span>
               {tools.find((t) => t.id === tool)?.label}{" "}
-              {target ? `· ${target.name}` : ""}
+              {target && !workspaceHost ? `· ${target.name}` : ""}
             </span>
             <span>
               画布 {project.document.width} × {project.document.height} · 版本{" "}
@@ -1613,6 +1844,8 @@ export default function CanvasApp({
           onClose={() => setCompare(undefined)}
         />
       )}
+      {layoutCandidate && <LayoutReview candidate={layoutCandidate} busy={busy} onClose={() => setLayoutCandidate(undefined)} onApply={() => void run(applyLayout)} />}
+      {cropCandidate && <CropReview candidate={cropCandidate} busy={busy} onClose={() => setCropCandidate(undefined)} onPreview={(top,bottom) => void run(() => updateScreenshotCrop(top,bottom))} onApply={() => void run(applyScreenshotCrop)} />}
     </section>
   );
 }

@@ -1,0 +1,57 @@
+{
+  "inspected_at": "2026-10-08",
+  "database_bytes": 750260224,
+  "journal_mode": "delete",
+  "json_storage": {
+    "video_workspaces": {
+      "rows": 23,
+      "json_characters": 13531976,
+      "max_row_characters": 2257599,
+      "rows_with_data_image": 6
+    },
+    "video_workspace_receipts": {
+      "rows": 370,
+      "json_characters": 733668836,
+      "max_row_characters": 2257599,
+      "rows_with_data_image": 328
+    },
+    "attachments": {
+      "rows": 176,
+      "json_characters": 44505,
+      "max_row_characters": 382,
+      "rows_with_data_image": 0
+    },
+    "turns": {
+      "rows": 68,
+      "json_characters": 23287,
+      "max_row_characters": 947,
+      "rows_with_data_image": 0
+    },
+    "canvas_projects": {
+      "rows": 46,
+      "json_characters": 30748,
+      "max_row_characters": 2275,
+      "rows_with_data_image": 0
+    },
+    "canvas_history": {
+      "rows": 196,
+      "json_characters": 82541,
+      "max_row_characters": 2102,
+      "rows_with_data_image": 0
+    }
+  },
+  "files": {
+    "images/miniclaw": {
+      "count": 157,
+      "bytes": 131663816
+    },
+    "attachments/miniclaw": {
+      "count": 2,
+      "bytes": 247
+    },
+    "studio_video": {
+      "count": 13,
+      "bytes": 21209302
+    }
+  }
+}

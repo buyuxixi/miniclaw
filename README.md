@@ -2,7 +2,9 @@
 
 基于 [Hermes Agent](https://github.com/NousResearch/hermes-agent) 二次开发的 Web 聊天智能体，用于个人 Agent 工程学习与电商业务实践。
 
-第一版先跑通普通聊天与工具执行。后续按业务需要扩展商品图片编辑、口播与内容辅助，不为覆盖概念提前加入复杂架构。
+当前围绕商品事实、口播、封面与视频，提供个人创作工作台；普通聊天与工具执行继续作为基础，按实际使用扩展。
+
+新开发者或 AI 接手请先读[项目交接与 AI 上手文档](docs/AI-ONBOARDING.md)：业务背景、当前主线、模块地图、数据边界、运行验证与已知限制（2026-10-08）。
 
 ## 当前能力
 
@@ -16,8 +18,13 @@
 - 图片与UTF-8 TXT/Markdown附件：上传、预览、移除、发送、历史恢复；视觉能力不足时明确提示。
 - 图片工作区与商品修图技能：本地调色、裁剪、旋转、翻转、缩放，新版本对比、下载与回填聊天；可选百炼 AI 编辑接入。
 - 独立图片项目与完整画布：图片/文字/形状图层、变换、历史与导出；矩形/套索/笔刷/SAM选区，本地局部编辑和百炼候选；可关联Chat和画布助手。
+- 单双色封面设计与口播优化：读取设计目录生成方案和提示词，按本轮事实改写口播与简单分镜；复用现有 Chat，详见[创作技能练习](docs/creator-skills.md)。
+- SRT附件与口播动效编排：程序按本轮真实字幕生成经过校验的JSON，可导入外部Overlay工作台，详见[视频编排](docs/video-overlay.md)。所有功能进度和后续串行验收见[进度总表](docs/project-progress.md)。
+- 固定创作任务：同一项目关联Chat，口播回复与画布封面预览确认后回传，五步骤编辑、作品预览、版本恢复及发布ZIP。支持“三图＋主稿”及“已剪好的镜头片＋主稿”生成百炼配音、字幕与1080p视频，后者可保留并压低背景音。详见[镜头片口播](docs/acceptance/11-narrated-footage.md)和[实拍样片报告](docs/acceptance/12-tea-v3-review.md)；平台发布目前人工完成。
 
 界面与浏览器状态管理在 `frontend/` 中实现；连接协议复用 Hermes 的共享 JSON-RPC 客户端。模型调用、Agent loop、工具分发和 SQLite 持久化继续由 Hermes 完成。
+
+原自由画布已接入同一正式宿主：[打开自由画布](http://127.0.0.1:9120/studio/index.html)。导演与自由 Chat 共用项目会话，完整精修保留图层、选区与历史；比较后采用图片只更新对应素材/镜头输入，不自动重做视频。云端新图次数在“项目进度”设置，默认 0，失败或未知请求仍保留预留。旧 9170 入口由日常启动脚本提供兼容跳转；旧独立 profile 需用 `scripts/migrate_studio.py` 先试跑、再显式 `--apply`，保留源库和一致性备份。详见[原画布联动验收与限制](docs/acceptance/28-original-canvas-integration.md)。
 
 ## Windows 首次安装
 
@@ -84,7 +91,7 @@ DEEPSEEK_API_KEY=你的真实Key
 hermes-agent/              官方上游 Git submodule，固定提交
 frontend/                 miniclaw React 前端、测试与锁文件
 plugins/miniclaw-files/    受限文本读取与可选文本产物工具
-skills/product-image-edit/ 内置商品修图流程，prepare按需安装
+skills/                   内置修图、画布、设计和口播流程，prepare按需安装
 miniclaw_web/              项目REST/RPC适配、附件、依赖与显示存储
 scripts/                  安装、初始化、启动与验证
 workspace/                虚构教学素材
@@ -106,7 +113,9 @@ runtime.local.json        可选本机运行时路径，不入库
 
 “设置 → 开发者 → 上下文诊断”可查看当前运行时用量、分类估算、文件加载清单、模型工具与历史恢复规则，并手动调用 Hermes 压缩。实际恢复检查及零模型费用的压缩结构演示见 [上下文实战](docs/context-learning.md)。面板快照不等于完整模型 API 请求。
 
-基础能力见[基础Agent实现](docs/basic-agent.md)。快捷修图见[图片编辑实现](docs/image-editing.md)，独立项目、完整画布、选区坐标与SAM安装见[画布实现](docs/canvas-app.md)。本机已验证TypeScript/Vite构建、35项前端行为、20项基础API、8项图像执行/Provider、12项画布检查、文件工具2项成功/10项拒绝，以及SQLite保存重开。另有真实SAM CPU、Skill→Agent→画布工具、百炼局部候选链路验收。
+基础能力见[基础Agent实现](docs/basic-agent.md)。快捷修图见[图片编辑实现](docs/image-editing.md)，独立项目、完整画布、选区坐标与SAM安装见[画布实现](docs/canvas-app.md)。本机已验证TypeScript/Vite构建、47项前端行为、23项基础API、8项图像执行/Provider、12项画布检查、6项字幕编译/工具、7项创作/真实视频合成、4项图片口播、4项镜头片口播、1项技能包安装检查，共112项；另有文件工具2项成功/10项拒绝与SQLite重开。真实SAM、百炼局部候选、设计/口播和字幕编排已联调；23秒实拍样片、指令配音、同版发布ZIP见[实拍迭代报告](docs/acceptance/12-tea-v3-review.md)。工程检查通过不表示用户效果验收通过。
+
+产品视觉最新样片为18秒虚构精华液广告：内置imagegen基准/引用编辑→百炼万相三段运动素材→六镜头预剪→同一原生项目Serena配音/字幕/成片/发布包。采用产品灯光、液滴微距与波浪，修复一次生成瓶盖上浮。成片与逐步验收见[精华液v4报告](docs/acceptance/17-serum-v4-review.md)；万相素材目前由样片脚本制作导入，网页自动导演/万相入口尚未实现，效果仍待用户验收。
 
 真实浏览器验证过多轮聊天、新会话边界、目录与文件工具、缺失文件失败、流式显示、停止、刷新恢复和后端重启后的旧页面重连。权限复核纠正过错误的配置字段，并在修正后重新验证真实 GUI agent 仅开放两个文件工具及模型工具闭环。
 

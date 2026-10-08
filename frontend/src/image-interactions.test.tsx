@@ -98,3 +98,18 @@ test('putting an image into a full chat draft preserves all existing attachments
   expect(JSON.parse(localStorage.getItem('miniclaw.draft.owner-a')!).attachments).toEqual(attachments);
   expect(host.querySelector<HTMLTextAreaElement>('#message-input')?.value).toBe('不要丢失');
 });
+
+
+test('Escape in nested detail view keeps the editor and its settings open', async () => {
+  const close = vi.fn();
+  await workspace({onClose:close});
+  await click('放大对照商品细节');
+  const detail = host.querySelector('[aria-label="商品细节对照"]')!;
+  const event = new Event('cancel',{bubbles:true,cancelable:true});
+  await act(async () => { detail.dispatchEvent(event); });
+  expect(event.defaultPrevented).toBe(true);
+  expect(close).not.toHaveBeenCalled();
+  expect(host.querySelector('[aria-label="商品细节对照"]')).toBeNull();
+  expect(host.querySelector('[aria-label="图片编辑"]')).not.toBeNull();
+  expect(host.querySelector<HTMLSelectElement>('[aria-label="选择图片版本"]')!.value).toBe(source.id);
+});

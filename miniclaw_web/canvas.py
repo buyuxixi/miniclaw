@@ -28,6 +28,7 @@ from .canvas_document import (
 )
 from .images import local_edit
 from .image_provider import edit_image, provider_status
+from .screenshot_crop import suggest as suggest_screenshot_crop
 
 
 class Conflict(ValueError):
@@ -60,6 +61,8 @@ class Canvas:
                         "UPDATE canvas_jobs SET data=? WHERE id=?",
                         (json.dumps(job), job_id),
                     )
+        from .image_plans import ImagePlans
+        self.plans = ImagePlans(self)
 
     @staticmethod
     def owner(project):
@@ -112,6 +115,7 @@ class Canvas:
             document=blank(),
         )
         with self.store.connect() as db:
+            version=self._version(db,project,row['document'],'创建画布')
             db.execute(
                 "INSERT INTO canvas_projects VALUES (?,?)", (project, json.dumps(row))
             )
@@ -121,7 +125,7 @@ class Canvas:
                     project,
                     0,
                     json.dumps(
-                        dict(document=row["document"], label="创建画布", time=now)
+                        dict(document=row["document"], label="创建画布", time=now, version_id=version)
                     ),
                 ),
             )
@@ -171,13 +175,18 @@ class Canvas:
         )
         db.execute("DELETE FROM canvas_selections WHERE project=?", (row["id"],))
 
-    def save(self, project, revision, document, label="编辑画布"):
+    def save(self, project, revision, document, label="编辑画布", *, plan_id=None):
         document = validate(document, lambda a: self.asset(project, a))
         label = self._name(label)
         with self.lock, self.store.connect() as db:
             db.execute("BEGIN IMMEDIATE")
             row = self._get(db, project)
             self._cas(row, revision)
+            plan = None
+            if plan_id is not None:
+                plan = self.plans._read(db, project, plan_id)
+                if plan['state'] != 'ready' or plan['revision'] != revision or plan['document'] != document or plan['chat_id'] != row['chat_id']:
+                    raise Conflict('修改方案已变化，请重新预览')
             ensure_unlocked(row["document"], document)
             row.update(
                 document=document,
@@ -185,6 +194,7 @@ class Canvas:
                 cursor=row["cursor"] + 1,
                 updated=time.time(),
             )
+            version=self._version(db,project,document,label)
             db.execute(
                 "DELETE FROM canvas_history WHERE project=? AND seq>=?",
                 (project, row["cursor"]),
@@ -195,7 +205,7 @@ class Canvas:
                     project,
                     row["cursor"],
                     json.dumps(
-                        dict(document=document, label=label, time=time.time()),
+                        dict(document=document, label=label, time=time.time(), version_id=version),
                         ensure_ascii=False,
                     ),
                 ),
@@ -205,6 +215,10 @@ class Canvas:
                 (project, row["cursor"] - 100),
             )
             self._write(db, row)
+            if plan is not None:
+                plan.update(revision=row['revision'], state='prepared' if plan['steps'][-1]['action'] == 'ai_edit' else 'applied', selection_id=None)
+                plan.pop('document', None)
+                self.plans._write(db, plan)
             return row
 
     def history(self, project):
@@ -242,7 +256,50 @@ class Canvas:
                 revision=row["revision"] + 1,
                 updated=time.time(),
             )
+            snapshot=json.loads(found[0])
+            if snapshot.get('version_id'):
+                self.store.versions.select(db,'canvas:'+project,snapshot['version_id'])
+            else:
+                self._version(db,project,row['document'],'恢复历史工作图')
             self._write(db, row)
+            return row
+
+    def _version(self, db, project, document, label):
+        objects=[]
+        for layer in document['layers']:
+            if layer.get('asset_id'):
+                found=db.execute('SELECT data FROM attachments WHERE id=? AND owner=?',(layer['asset_id'],self.owner(project))).fetchone()
+                if found and json.loads(found[0]).get('object_id'):objects.append(json.loads(found[0])['object_id'])
+        return self.store.versions.append(db,'canvas:'+project,'document','document',document,label,objects)
+
+    def versions(self, project):
+        self.get(project)
+        return self.store.versions.list('canvas:'+project,'document','document')
+
+    def context_reference(self, project, revision, workspace=None):
+        """Read the editable document and its immutable version in one snapshot."""
+        with self.lock,self.store.connect() as db:
+            db.execute('BEGIN')
+            row=self._get(db,project);self._cas(row,revision)
+            if workspace and not db.execute('SELECT 1 FROM video_precision_links WHERE workspace=? AND project_id=?',(workspace,project)).fetchone():
+                raise ValueError('精修画布不属于当前创作项目，请重新选择目标')
+            head=db.execute('SELECT revision_id FROM media_heads WHERE item_id=?',(self.store.versions.item_id('canvas:'+project,'document','document'),)).fetchone()
+        return row,head[0] if head else None
+
+    def restore_version(self, project, revision, version_id):
+        with self.lock, self.store.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row=self._get(db,project);self._cas(row,revision)
+            version=self.store.versions.read(db,'canvas:'+project,version_id)
+            if version['kind']!='document':raise ValueError('工作图版本无效')
+            document=validate(version['data'],lambda a:self.asset(project,a))
+            ensure_unlocked(row['document'],document)
+            row.update(document=document,cursor=row['cursor']+1,revision=row['revision']+1,updated=time.time())
+            db.execute('DELETE FROM canvas_history WHERE project=? AND seq>=?',(project,row['cursor']))
+            db.execute('INSERT INTO canvas_history VALUES (?,?,?)',(project,row['cursor'],json.dumps(dict(document=document,label='恢复版本',time=time.time(),version_id=version_id),ensure_ascii=False)))
+            db.execute('DELETE FROM canvas_history WHERE project=? AND seq<?',(project,row['cursor']-100))
+            self.store.versions.select(db,'canvas:'+project,version_id)
+            self._write(db,row)
             return row
 
     def add_asset(self, project, raw, name):
@@ -276,9 +333,12 @@ class Canvas:
             result.append({**public(record), "width": size[0], "height": size[1]})
         return result
 
-    def export(self, project, seq=None):
+    def export(self, project, seq=None, version_id=None):
         row = self.get(project)
         document = row["document"]
+        if version_id is not None:
+            with self.store.connect() as db:
+                document=self.store.versions.read(db,'canvas:'+project,version_id)['data']
         if seq is not None:
             with self.store.connect() as db:
                 found = db.execute(
@@ -289,6 +349,23 @@ class Canvas:
                 raise ValueError("版本不存在")
             document = json.loads(found[0])["document"]
         return png(render(document, lambda a: self.asset(project, a)))
+
+    def preview(self, project, revision, document):
+        row = self.get(project)
+        self._cas(row, revision)
+        if row['archived']:
+            raise ValueError('项目已归档，请先恢复')
+        document = validate(document, lambda a: self.asset(project, a))
+        result = png(render(document, lambda a: self.asset(project, a)))
+        self._cas(self.get(project), revision)
+        return result
+
+    def crop_suggestion(self, project, revision):
+        row = self.get(project)
+        self._cas(row, revision)
+        result = suggest_screenshot_crop(render(row['document'], lambda a: self.asset(project, a)))
+        self._cas(self.get(project), revision)
+        return result
 
     def _target(self, project, revision, layer_id):
         row = self.get(project)
@@ -547,6 +624,7 @@ class Canvas:
         return self._mask_store(project, row, layer, mask)
 
     def jobs(self, project):
+        from .generation_audit import entry
         self.get(project)
         with self.store.connect() as db:
             rows = [
@@ -557,11 +635,11 @@ class Canvas:
                 )
             ]
         return [
-            {
+            {**{
                 k: v
                 for k, v in row.items()
                 if k not in ("input_mask", "input_document", "signature")
-            }
+            }, 'audit': entry(row, 'image')}
             for row in rows
         ]
 
@@ -590,6 +668,11 @@ class Canvas:
         region=True,
         feather=0,
         selection_id=None,
+        *,
+        visible_only=False,
+        model=None,
+        provider='dashscope',
+        task='edit',
     ):
         if not isinstance(prompt, str) or not 1 <= len(prompt.strip()) <= 2000:
             raise ValueError("修图要求需要1到2000字")
@@ -599,11 +682,16 @@ class Canvas:
             raise ValueError("请求ID无效")
         if type(region) is not bool:
             raise ValueError("区域范围无效")
+        if type(visible_only) is not bool:
+            raise ValueError('可见画面范围无效')
         number(feather, 0, 20)
+        signature_args = [revision, layer_id, prompt, region, feather, selection_id]
+        if model is not None or task != 'edit' or provider != 'dashscope':
+            signature_args += [task, provider, model]
+        if visible_only:
+            signature_args.append('visible-only')
         signature = hashlib.sha256(
-            json.dumps(
-                [revision, layer_id, prompt, region, feather, selection_id]
-            ).encode()
+            json.dumps(signature_args).encode()
         ).hexdigest()
         job_id = hashlib.sha256((project + ":" + request_id).encode()).hexdigest()[:32]
         with self.lock, self.store.connect() as db:
@@ -625,9 +713,17 @@ class Canvas:
                     "L", (round(layer["width"]), round(layer["height"])), 255
                 )
             )
+            if visible_only:
+                mask = ImageChops.multiply(mask, self.visible_mask(row['document'], layer))
             if not mask.getbbox():
                 raise ValueError("选区为空")
-            if not provider_status()["configured"]:
+            status = provider_status()
+            if model is not None or task != 'edit' or provider != 'dashscope':
+                from .media_models import resolve
+                option = resolve(task, provider, model)
+                if task not in ('edit', 'generate'): raise ValueError('图片任务无效')
+                status = {**status, **option}
+            if not status["configured"]:
                 raise ValueError("请先配置百炼Key")
             active = [
                 json.loads(r[0])
@@ -644,19 +740,33 @@ class Canvas:
                 source_id=layer["asset_id"],
                 prompt=prompt,
                 region=region,
+                visible_only=visible_only,
                 feather=feather,
                 signature=signature,
                 state="queued",
+                model=status.get('model'),
+                provider=provider,
+                task=task,
+                provider_region=status.get('region'),
                 created=time.time(),
                 input_mask=base64.b64encode(png(mask)).decode(),
                 input_document=row["document"],
             )
+            policy = getattr(self, 'submission_policy', None)
+            if policy:
+                policy(db, project, job_id)
             db.execute(
                 "INSERT INTO canvas_jobs VALUES (?,?,?)",
                 (job_id, project, json.dumps(job)),
             )
         self.executor.submit(self._execute, job)
         return self.job(project, job_id)
+
+    @staticmethod
+    def visible_mask(document, layer):
+        canvas = Image.new('L', (document['width'], document['height']), 255)
+        return canvas.transform((round(layer['width']), round(layer['height'])),
+                                Image.Transform.AFFINE, affine(layer), Image.Resampling.NEAREST)
 
     def _job_write(self, job):
         with self.store.connect() as db:
@@ -672,6 +782,15 @@ class Canvas:
             job["state"] = "running"
             self._job_write(job)
         try:
+            if job.get('task') == 'generate':
+                from .image_provider import generate_image
+                raw, provider_id, audit = generate_image(job['prompt'], provider=job['provider'], model=job['model'])
+                with self.lock:
+                    if self.job(job['project'], job['id'])['state'] != 'running': return
+                    asset = self.add_asset(job['project'], raw, 'generated-image.png')
+                    job.update(audit); job.update(state='succeeded', output=asset, provider_request_id=provider_id)
+                    self._job_write(job)
+                return
             source = Image.open(
                 self.asset(job["project"], job["source_id"])["path"]
             ).convert("RGBA")
@@ -679,6 +798,11 @@ class Canvas:
                 "L"
             )
             box = mask.getbbox()
+            visible = None
+            if job.get('visible_only'):
+                layer = next(l for l in job['input_document']['layers'] if l['id'] == job['layer_id'])
+                visible = self.visible_mask(job['input_document'], layer)
+            bounds = visible.getbbox() if visible else (0,0,source.width,source.height)
             # Send the selected bounding area with some context, then composite locally.
             # Qwen edit has no native mask contract; outside pixels are protected here.
             pad = (
@@ -687,14 +811,21 @@ class Canvas:
                 else 0
             )
             crop = (
-                max(0, box[0] - pad),
-                max(0, box[1] - pad),
-                min(source.width, box[2] + pad),
-                min(source.height, box[3] + pad),
+                max(bounds[0], box[0] - pad),
+                max(bounds[1], box[1] - pad),
+                min(bounds[2], box[2] + pad),
+                min(bounds[3], box[3] + pad),
             )
-            raw, provider_id = edit_image(
-                png(source.crop(crop)), "image/png", job["prompt"]
+            provider_source = source
+            if visible:
+                provider_source = Image.composite(source, Image.new('RGBA', source.size), visible)
+            provider_result = edit_image(
+                png(provider_source.crop(crop)), "image/png", job["prompt"],
+                model=job.get('model'), audit=True
             )
+            raw, provider_id = provider_result[:2]
+            if len(provider_result) > 2:
+                job.update(provider_result[2])
             generated = (
                 Image.open(io.BytesIO(raw))
                 .convert("RGBA")
@@ -750,10 +881,39 @@ class Canvas:
                 )
         return self.jobs(project)
 
+    def review_job(self, project, revision, job_id, decision, checks, reason):
+        allowed = {'shape', 'color', 'parts', 'texture'}
+        if decision not in ('keep', 'reject') or not isinstance(checks, list) or any(not isinstance(c, str) or c not in allowed for c in checks) or len(set(checks)) != len(checks):
+            raise ValueError('候选核对字段无效')
+        if not isinstance(reason, str) or len(reason) > 300 or '\0' in reason:
+            raise ValueError('核对原因最多300字')
+        if decision == 'keep' and set(checks) != allowed:
+            raise ValueError('请核对轮廓、颜色、部件和纹理四项')
+        if decision == 'reject' and not reason.strip():
+            raise ValueError('请说明未采用原因')
+        with self.lock, self.store.connect() as db:
+            self._cas(self.get(project), revision)
+            found = db.execute('SELECT data FROM canvas_jobs WHERE id=? AND project=?', (job_id, project)).fetchone()
+            if not found:
+                raise ValueError('候选不存在或不属于当前项目')
+            job = json.loads(found[0])
+            if job['state'] != 'succeeded' or not job.get('output'):
+                raise ValueError('没有可核对的候选')
+            job['review'] = {'decision': decision, 'checks': checks, 'reason': reason.strip(), 'time': time.time()}
+            job['reviews'] = (job.get('reviews', []) + [job['review']])[-30:]
+            db.execute('UPDATE canvas_jobs SET data=? WHERE id=?', (json.dumps(job), job_id))
+        return {k:v for k,v in job.items() if k not in ('input_mask','input_document','signature')}
+
     def adopt(self, project, revision, job_id):
+        with self.lock:
+            return self._adopt(project, revision, job_id)
+
+    def _adopt(self, project, revision, job_id):
         job = self.job(project, job_id)
         if not job or job["state"] != "succeeded":
             raise ValueError("没有可采用的结果")
+        if job.get('review', {}).get('decision') == 'reject':
+            raise ValueError('候选已标记为未采用，请先重新核对')
         row, layer = self._target(project, revision, job["layer_id"])
         if revision != job["revision"] or layer["asset_id"] != job["source_id"]:
             raise Conflict("画布已改变；候选已保留，可作为新图层导入，不能覆盖当前层")

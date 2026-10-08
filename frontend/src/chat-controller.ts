@@ -1,10 +1,11 @@
 import { JsonRpcGatewayClient, gatewayUrl, type ConnectionState, type GatewayEvent } from './gateway';
-import { assistantText, finishItems, historyItems, resultFailed, storedSessionId, withToolResults } from './transcript';
+import { assistantText, finishItems, historyItems, resultFailed, storedSessionId, withToolResults, withCreatorContexts } from './transcript';
 import { storedToolRows } from './history-api';
 import { prepareSkillPrompt } from './skill-prompt';
 import type { ChatState, HistoryRow, SessionRow, SessionSnapshot } from './types';
 import type { Attachment, TurnDisplay } from './attachments';
 import { readApi } from './management-api';
+import type { CreatorContext, CreatorTurn } from './creator-api';
 
 const blank = (): ChatState => ({
   sessions: [], sessionId: '', storedId: '', items: [], info: {},
@@ -12,6 +13,8 @@ const blank = (): ChatState => ({
 });
 
 export class ChatController {
+  workspace?: { id: string; target?: string };
+  resumeId?: string;
   readonly client = new JsonRpcGatewayClient({ requestTimeoutMs: 30_000 });
   state = blank();
   connection: ConnectionState = 'idle';
@@ -26,7 +29,7 @@ export class ChatController {
     this.client.onState(state => {
       this.connection = state;
       if (state === 'closed' || state === 'error') {
-        this.patch({ busy: false, error: '连接已断开。重新连接后会从后端恢复会话；消息不会自动重发。' });
+        this.patch({ busy: false, openingId: undefined, error: '连接已断开。重新连接后会从后端恢复会话；消息不会自动重发。' });
       } else this.notify();
     });
   }
@@ -39,16 +42,20 @@ export class ChatController {
   private notify() { for (const listener of this.listeners) listener(); }
   private patch(next: Partial<ChatState>) { this.state = { ...this.state, ...next }; this.notify(); }
   private fail(error: unknown) {
-    if (!this.disposed) this.patch({ error: error instanceof Error ? error.message : String(error), busy: false });
+    if (!this.disposed) this.patch({ error: error instanceof Error ? error.message : String(error), busy: false, openingId: undefined, status: '' });
   }
 
   async connect() {
-    this.patch({ busy: true, error: '' });
+    // Keep this route stable while a new session emits updates to the Chat UI.
+    const workspace = this.workspace;
+    this.patch({ busy: true, error: '', workspaceConnecting: !!workspace });
     try {
       await this.client.connect(await gatewayUrl(this.connection === 'closed' || this.connection === 'error'));
       await this.refresh();
       if (this.disposed) return;
-      const saved = this.state.storedId || localStorage.getItem('miniclaw.selected');
+      const projectLink = workspace ? await readApi<{chat_id?: string}>(`/api/workspaces/${workspace.id}/chat`) : undefined;
+      const explicit = this.state.storedId || this.resumeId;
+      const saved = explicit || (workspace ? projectLink?.chat_id : localStorage.getItem('miniclaw.selected'));
       // A selected older session can be outside the recent sidebar window.
       // Resume by its durable id rather than silently replacing it on reload.
       if (saved) {
@@ -62,7 +69,16 @@ export class ChatController {
         }
       }
       else { this.patch({ busy: false }); await this.newSession(); }
+      if (workspace && !explicit && !this.state.running) {
+        const linked = await readApi<{chat_id?: string}>(`/api/workspaces/${workspace.id}/chat`);
+        if (linked.chat_id && linked.chat_id !== this.state.storedId) await this.open(linked.chat_id);
+        if (!linked.chat_id && this.state.sessionId) {
+          const {writeApi} = await import('./management-api');
+          await writeApi(`/api/workspaces/${workspace.id}/chat`, 'POST', {session_id:this.state.sessionId});
+        }
+      }
     } catch (error) { this.fail(error); }
+    finally { this.patch({ workspaceConnecting: false }); }
   }
 
   async refresh() {
@@ -70,15 +86,24 @@ export class ChatController {
     if (!this.disposed) this.patch({ sessions: result.sessions });
   }
 
-  private applySnapshot(snapshot: SessionSnapshot) {
-    let items = historyItems(snapshot.messages ?? []);
+  private applySnapshot(snapshot: SessionSnapshot, restoredItems?: ChatState['items']) {
+    let items = restoredItems ?? historyItems(snapshot.messages ?? []);
     const running = Boolean(snapshot.running ?? snapshot.info.running ?? snapshot.inflight?.streaming);
     if (snapshot.inflight?.assistant) items = assistantText(items, snapshot.inflight.assistant, false);
     const storedId = storedSessionId(snapshot);
     localStorage.setItem('miniclaw.selected', storedId);
+    this.resumeId = storedId;
+    // Preserve the selected history/new conversation across refresh without
+    // changing the workspace's durable project conversation.
+    if (typeof location !== 'undefined' && (location.search?.includes('workspace=') || location.search?.includes('chat=')) && typeof history !== 'undefined') {
+      const url = new URL(location.href);
+      url.searchParams.set('session', storedId);
+      if (this.state.storedId && this.state.storedId !== storedId) url.searchParams.delete('message');
+      history.replaceState(null, '', url);
+    }
     this.patch({
       sessionId: snapshot.session_id, storedId, info: snapshot.info, items, running,
-      busy: false, status: running ? '正在继续执行' : '',
+      busy: false, openingId: undefined, status: running ? '正在继续执行' : '',
       error: snapshot.inflight?.error ?? snapshot.info.credential_warning ?? '',
     });
   }
@@ -108,22 +133,29 @@ export class ChatController {
   async open(storedId: string, recovering = false) {
     if (this.state.running && !recovering) return;
     const generation = ++this.selection;
-    this.patch({ busy: true, error: '' });
+    this.patch({ busy: true, openingId: storedId, status: '正在恢复对话…', error: '' });
     try {
       const snapshot = await this.client.request<SessionSnapshot>('session.resume', {
         session_id: storedId, source: 'desktop', eager_build: true,
       });
       if (!this.disposed && generation === this.selection) {
-        this.applySnapshot(snapshot);
-        if (!this.state.running) await this.reconcile(snapshot.session_id, generation);
+        const running = Boolean(snapshot.running ?? snapshot.info.running ?? snapshot.inflight?.streaming);
+        let warning = '';
+        const items = running ? undefined : await this.restoreItems(snapshot.messages ?? [], storedSessionId(snapshot)).catch(() => {
+          warning = '对话已恢复，附件或工具详情暂时未能补齐；请稍后重新打开。';
+          return undefined;
+        });
+        if (!this.disposed && generation === this.selection) { this.applySnapshot(snapshot, items); if(warning) this.patch({error:warning}); }
       }
     } catch (error) { if (generation === this.selection) this.fail(error); }
   }
 
-  async send(text: string, skill?: string, attachments: Attachment[] = [], canvasContext?: { project_id: string; revision: number; layer_id: string }): Promise<boolean> {
+  async send(text: string, skill?: string, attachments: Attachment[] = [], canvasContext?: { project_id: string; revision: number; layer_id: string; mode?: 'plan' | 'edit' | 'context' }, creatorContext?: CreatorContext): Promise<boolean> {
     if ((!text.trim() && !attachments.length) || this.state.running || this.state.busy || !this.state.sessionId || this.connection !== 'open') return false;
     const previous = this.state.items;
     const sessionId = this.state.sessionId;
+    const workspace = this.workspace ? {...this.workspace} : undefined;
+    const storedId = this.state.storedId;
     const turn = ++this.turn;
     this.preparingSkill = Boolean(skill);
     let submitted = false;
@@ -132,9 +164,31 @@ export class ChatController {
       const prompt = skill ? await prepareSkillPrompt(this.client, sessionId, skill, text, () => turn === this.turn && sessionId === this.state.sessionId, Object.values(this.state.info.tools ?? {}).flat()) : { text, display: text };
       if (turn !== this.turn || !this.state.running || this.connection !== 'open' || sessionId !== this.state.sessionId) return false;
       this.preparingSkill = false;
-      this.patch({ items: [...previous, { id: crypto.randomUUID(), kind: 'user', text: prompt.display, attachments }], status: '正在提交' });
+      const userId = crypto.randomUUID();
+      let studioContext: {workspace: string; target?: string; revision: number} | undefined;
+      if (workspace) {
+        const linked = await readApi<{chat_id?: string}>(`/api/workspaces/${workspace.id}/chat`);
+        if (linked.chat_id !== storedId) throw Error('当前对话未关联此项目，请从项目入口恢复对话。草稿已保留。');
+        {
+          const record = await readApi<{revision:number}>(`/api/workspaces/${workspace.id}`);
+          studioContext = {workspace:workspace.id,target:workspace.target,revision:record.revision};
+          if((skill==='canvas-editor'||!skill&&Object.values(this.state.info.tools??{}).flat().includes('miniclaw_canvas_view')) && !canvasContext && workspace.target) {
+            const {writeApi}=await import('./management-api');
+            try {
+              const meta=await writeApi<{project?:string;revision:number;layer:string}>(`/api/workspaces/${workspace.id}/editing-target`,'POST',{target:workspace.target,session_id:sessionId});
+              if(meta.project)canvasContext={project_id:meta.project,revision:meta.revision,layer_id:meta.layer,mode:skill?'plan':'context'};
+              else if(skill)throw Error('请返回自由画布，在导演助手中选择要修改的参考图。草稿已保留。');
+            } catch(e) {if(skill)throw e;}
+          }
+        }
+      }
+      if (turn !== this.turn || sessionId !== this.state.sessionId) return false;
+      if (workspace?.id !== this.workspace?.id || workspace?.target !== this.workspace?.target) throw Error('项目或选择目标已切换，请重新发送。草稿已保留。');
+      this.patch({ items: [...previous, { id: userId, kind: 'user', text: prompt.display, attachments }], status: '正在提交' });
       submitted = true;
-      const accepted = await this.client.request<{ warning?: string }>('miniclaw.turn.submit', { session_id: sessionId, text, skill, attachments: attachments.map(a => a.id), ...(canvasContext ? { canvas_context: canvasContext } : {}) });
+      const accepted = await this.client.request<{ warning?: string; creator_context?: CreatorTurn }>('miniclaw.turn.submit', { session_id: sessionId, text, skill, attachments: attachments.map(a => a.id), ...(canvasContext ? { canvas_context: canvasContext } : {}), ...(creatorContext ? { creator_context: creatorContext } : {}), ...(studioContext ? {studio_context:studioContext} : {}) });
+      if (turn !== this.turn || sessionId !== this.state.sessionId) return false;
+      if (accepted.creator_context) this.patch({ items: withCreatorContexts(this.state.items.map(item => item.id === userId ? { ...item, creator_context: accepted.creator_context } : item)) });
       if (accepted.warning) this.patch({ error: accepted.warning });
       if (!this.state.running) await this.reconcile(sessionId, this.selection);
       return true;
@@ -224,19 +278,24 @@ export class ChatController {
       if (this.disposed || generation !== this.selection || turn !== this.turn || this.state.running) return;
       // A new empty session may exist only in the live gateway until its first
       // persisted message. Fetch durable tool bodies only when replay has tools.
-      const toolRows = result.messages.some(row => row.role === 'tool') ? await storedToolRows(storedId) : [];
+      const items = await this.restoreItems(result.messages, storedId);
       if (this.disposed || generation !== this.selection || turn !== this.turn || this.state.running) return;
-      const displays = result.messages.some(row => row.role === 'user') ? await readApi<Record<string, TurnDisplay>>(`/api/miniclaw/turns?owner=${encodeURIComponent(storedId)}`) : {};
-      if (this.disposed || generation !== this.selection || turn !== this.turn || this.state.running) return;
-      const items = historyItems(withToolResults(result.messages, toolRows)).map(item => {
-        const display = displays[item.id.replace('row-', '')];
-        return item.kind === 'user' && display ? { ...item, text: display.text, attachments: display.attachments } : item;
-      });
       this.patch({ items });
       await this.refresh();
     } catch (error) {
       if (generation === this.selection && turn === this.turn) this.fail(error);
     }
+  }
+
+  private async restoreItems(messages: HistoryRow[], storedId: string) {
+    const [toolRows, displays] = await Promise.all([
+      messages.some(row => row.role === 'tool') ? storedToolRows(storedId) : Promise.resolve([]),
+      messages.some(row => row.role === 'user') ? readApi<Record<string, TurnDisplay>>(`/api/miniclaw/turns?owner=${encodeURIComponent(storedId)}`) : Promise.resolve({} as Record<string, TurnDisplay>),
+    ]);
+    return withCreatorContexts(historyItems(withToolResults(messages, toolRows)).map(item => {
+      const display = displays[item.id.replace('row-', '')];
+      return item.kind === 'user' && display ? { ...item, text: display.text, attachments: display.attachments, creator_context: display.creator_context } : item;
+    }));
   }
 
   private event(event: GatewayEvent) {

@@ -2,13 +2,17 @@ import { useEffect, useState } from 'react';
 import type { Attachment } from './attachments';
 import { readApi } from './management-api';
 import { imageLabels, jobLabels, useImageBlob, type ImageJob } from './image-api';
+import { ImageDetailReview } from './ImageDetailReview';
 
 export function ImageComparison({ owner, source, output }: { owner: string; source: Attachment; output?: Attachment }) {
   const before = useImageBlob(owner, source); const after = useImageBlob(owner, output);
-  return <div className={`image-comparison ${output ? '' : 'single'}`}>
+  const [details, setDetails] = useState(false);
+  useEffect(() => { setDetails(false); }, [owner, source.id, output?.id]);
+  return <><div className={`image-comparison ${output ? '' : 'single'}`}>
     <figure><div className="image-stage">{before.url ? <img src={before.url} alt={`修改前 ${source.name}`} /> : <p>{before.error || '正在读取原图…'}</p>}</div><figcaption>{output ? '修改前' : '当前版本'} · {before.url && <a href={before.url} download={source.name}>{output ? '下载原图' : '下载这张图'}</a>}</figcaption></figure>
     {output && <figure><div className="image-stage">{after.url ? <img src={after.url} alt={`修改后 ${output.name}`} /> : <p>{after.error || '正在读取结果…'}</p>}</div><figcaption>修改后 · {after.url && <a href={after.url} download={output.name}>下载 PNG</a>}</figcaption></figure>}
-  </div>;
+  </div><button className="secondary-action" disabled={!before.url || (!!output && !after.url)} onClick={()=>setDetails(true)}>{output ? '放大对照商品细节' : '放大查看图片'}</button>
+    {details && before.url && (!output || after.url) && <ImageDetailReview key={`${owner}:${source.id}:${output?.id}`} before={before.url} after={output ? after.url : undefined} onClose={()=>setDetails(false)} />}</>;
 }
 
 export function ImageJobCard({ owner, result, onEdit }: { owner: string; result: unknown; onEdit?: (image: Attachment) => void }) {

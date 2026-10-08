@@ -24,3 +24,8 @@ test('a bound tool is still missing until this session actually loaded it', () =
 test('custom skill identifiers that match Object properties still display their own description', () => {
   expect(skillDetails({ name: 'constructor', description: 'custom flow' })).toEqual({ title: 'constructor', description: 'custom flow' });
 });
+
+test('a declared flow with missing package resources is unavailable even when its tools loaded', () => {
+  const skill = { name: 'mono-color', enabled: true, binding: { version: 1, required_tools: ['skill_view'], content_hash: 'sha', current: false, resource_error: '配套资料缺失：colors.json' } };
+  expect(skillReadiness(skill, ['skill_view'])).toEqual({ state: 'missing', label: '配套资料不可用', reason: '配套资料缺失：colors.json' });
+});

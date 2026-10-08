@@ -40,6 +40,8 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Web build failed' }
         & $runtimeConfig.node $runtimeConfig.npm_cli run build --workspace ui-tui
     } elseif ($Action -eq 'test') {
+        & $pythonPath (Join-Path $projectRoot 'tests\test_bundled_skills.py')
+        if ($LASTEXITCODE -ne 0) { throw 'Bundled Skill checks failed' }
         & $pythonPath (Join-Path $PSScriptRoot 'verify_offline.py')
         if ($LASTEXITCODE -ne 0) { throw 'Offline checks failed' }
         & $pythonPath (Join-Path $projectRoot 'tests\test_basic_api.py')
@@ -48,6 +50,16 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Image editing checks failed' }
         & $pythonPath (Join-Path $projectRoot 'tests\test_canvas.py')
         if ($LASTEXITCODE -ne 0) { throw 'Canvas checks failed' }
+        & $pythonPath (Join-Path $projectRoot 'tests\test_image_plans.py')
+        if ($LASTEXITCODE -ne 0) { throw 'Image plan checks failed' }
+        & $pythonPath (Join-Path $projectRoot 'tests\test_overlay.py')
+        if ($LASTEXITCODE -ne 0) { throw 'Subtitle/overlay checks failed' }
+        & $pythonPath (Join-Path $projectRoot 'tests\test_creator.py')
+        if ($LASTEXITCODE -ne 0) { throw 'Creator/video checks failed' }
+        & $pythonPath (Join-Path $projectRoot 'tests\test_storyboard.py')
+        if ($LASTEXITCODE -ne 0) { throw 'Storyboard tests failed' }
+        & $pythonPath (Join-Path $projectRoot 'tests\test_narrated.py')
+        if ($LASTEXITCODE -ne 0) { throw 'Narrated storyboard checks failed' }
         Set-Location (Join-Path $projectRoot 'frontend')
         & $runtimeConfig.node $runtimeConfig.npm_cli test
     } else {
@@ -62,6 +74,10 @@ try {
             if ($Action -eq 'web') {
                 $env:HERMES_WEB_DIST = Join-Path $projectRoot 'frontend\dist'
                 if (-not (Test-Path -LiteralPath (Join-Path $env:HERMES_WEB_DIST 'index.html'))) { throw 'Run .\scripts\miniclaw.ps1 build first' }
+                if ($Port -eq 9120 -and -not (Get-NetTCPConnection -LocalPort 9170 -State Listen -ErrorAction SilentlyContinue)) {
+                    $studioCompatScript = Join-Path $projectRoot 'scripts\studio_compat.py'
+                    Start-Process -FilePath $pythonPath -ArgumentList ('"' + $studioCompatScript + '"') -WorkingDirectory $projectRoot -WindowStyle Hidden
+                }
             } else {
                 Remove-Item Env:HERMES_WEB_DIST -ErrorAction SilentlyContinue
             }

@@ -1,4 +1,5 @@
 import type { Attachment } from './attachments';
+import type { CreatorTurn } from './creator-api';
 export interface HistoryRow {
   role: string;
   text?: string | null;
@@ -20,6 +21,7 @@ export interface ChatItem {
   result?: unknown;
   status?: 'running' | 'done' | 'error' | 'interrupted' | 'unavailable';
   attachments?: Attachment[];
+  creator_context?: CreatorTurn;
 }
 
 export interface SessionRow {
@@ -60,6 +62,8 @@ export interface ChatState {
   info: SessionInfo;
   running: boolean;
   busy: boolean;
+  workspaceConnecting?: boolean;
+  openingId?: string;
   status: string;
   error: string;
 }

@@ -1,0 +1,597 @@
+{
+  "integrity": "ok",
+  "foreign_key_errors": 0,
+  "tables": {
+    "attachments": {
+      "rows": 176,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_attachments_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "json_invalid": 0,
+      "inline_image_rows": 0,
+      "json_bytes": 59082
+    },
+    "bindings": {
+      "rows": 9,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_bindings_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "name"
+          ]
+        }
+      ],
+      "json_invalid": 0,
+      "inline_image_rows": 0,
+      "json_bytes": 1331
+    },
+    "canvas_history": {
+      "rows": 196,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_canvas_history_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "project",
+            "seq"
+          ]
+        }
+      ],
+      "json_invalid": 0,
+      "inline_image_rows": 0,
+      "json_bytes": 85943
+    },
+    "canvas_jobs": {
+      "rows": 10,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_canvas_jobs_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "json_invalid": 0,
+      "inline_image_rows": 0,
+      "json_bytes": 73374
+    },
+    "canvas_plans": {
+      "rows": 8,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_canvas_plans_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "json_invalid": 0,
+      "inline_image_rows": 0,
+      "json_bytes": 7556
+    },
+    "canvas_projects": {
+      "rows": 46,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_canvas_projects_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "json_invalid": 0,
+      "inline_image_rows": 0,
+      "json_bytes": 31624
+    },
+    "canvas_selections": {
+      "rows": 1,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_canvas_selections_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "project"
+          ]
+        }
+      ],
+      "json_invalid": 0,
+      "inline_image_rows": 0,
+      "json_bytes": 1274
+    },
+    "creation_decisions": {
+      "rows": 10,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_creation_decisions_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "scope",
+            "id"
+          ]
+        }
+      ],
+      "json_invalid": 0,
+      "inline_image_rows": 0,
+      "json_bytes": 15482
+    },
+    "creator_jobs": {
+      "rows": 11,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_creator_jobs_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "json_invalid": 0,
+      "inline_image_rows": 0,
+      "json_bytes": 3335
+    },
+    "creator_projects": {
+      "rows": 15,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_creator_projects_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "json_invalid": 0,
+      "inline_image_rows": 0,
+      "json_bytes": 42809
+    },
+    "file_objects": {
+      "rows": 72,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_file_objects_3",
+          "unique": true,
+          "origin": "u",
+          "columns": [
+            "backend",
+            "storage_key"
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_file_objects_2",
+          "unique": true,
+          "origin": "u",
+          "columns": [
+            "sha256"
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_file_objects_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    "image_jobs": {
+      "rows": 10,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_image_jobs_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "json_invalid": 0,
+      "inline_image_rows": 0,
+      "json_bytes": 6921
+    },
+    "media_grants": {
+      "rows": 247,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_media_grants_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "scope",
+            "object_id"
+          ]
+        }
+      ]
+    },
+    "media_heads": {
+      "rows": 376,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_media_heads_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "item_id"
+          ]
+        }
+      ]
+    },
+    "media_items": {
+      "rows": 376,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_media_items_2",
+          "unique": true,
+          "origin": "u",
+          "columns": [
+            "scope",
+            "target",
+            "kind"
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_media_items_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    "media_revision_objects": {
+      "rows": 356,
+      "indexes": [
+        {
+          "name": "media_revision_objects_object",
+          "unique": false,
+          "origin": "c",
+          "columns": [
+            "object_id"
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_media_revision_objects_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "revision_id",
+            "object_id"
+          ]
+        }
+      ]
+    },
+    "media_revisions": {
+      "rows": 533,
+      "indexes": [
+        {
+          "name": "media_revisions_item_time",
+          "unique": false,
+          "origin": "c",
+          "columns": [
+            "item_id",
+            "created_at"
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_media_revisions_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "json_invalid": 0,
+      "inline_image_rows": 0,
+      "json_bytes": 123642
+    },
+    "schema_migrations": {
+      "rows": 2,
+      "indexes": []
+    },
+    "studio_image_requests": {
+      "rows": 3,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_studio_image_requests_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "workspace",
+            "id"
+          ]
+        }
+      ],
+      "json_invalid": 0,
+      "inline_image_rows": 0,
+      "json_bytes": 1086
+    },
+    "studio_limits": {
+      "rows": 3,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_studio_limits_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "workspace"
+          ]
+        }
+      ]
+    },
+    "studio_links": {
+      "rows": 9,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_studio_links_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "workspace"
+          ]
+        }
+      ]
+    },
+    "studio_projects": {
+      "rows": 1,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_studio_projects_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "workspace"
+          ]
+        }
+      ]
+    },
+    "studio_reservations": {
+      "rows": 7,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_studio_reservations_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "job"
+          ]
+        }
+      ]
+    },
+    "studio_video_jobs": {
+      "rows": 5,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_studio_video_jobs_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "json_invalid": 0,
+      "inline_image_rows": 0,
+      "json_bytes": 11530
+    },
+    "studio_video_renders": {
+      "rows": 1,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_studio_video_renders_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "json_invalid": 0,
+      "inline_image_rows": 0,
+      "json_bytes": 641
+    },
+    "turns": {
+      "rows": 68,
+      "indexes": [],
+      "json_invalid": 0,
+      "inline_image_rows": 0,
+      "json_bytes": 37956
+    },
+    "video_precision_links": {
+      "rows": 26,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_video_precision_links_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "workspace",
+            "object_id"
+          ]
+        }
+      ],
+      "json_invalid": 0,
+      "inline_image_rows": 0,
+      "json_bytes": 4566
+    },
+    "video_precision_requests": {
+      "rows": 4,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_video_precision_requests_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "project",
+            "request_id"
+          ]
+        }
+      ],
+      "json_invalid": 0,
+      "inline_image_rows": 0,
+      "json_bytes": 1752
+    },
+    "video_workspace_receipts": {
+      "rows": 370,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_video_workspace_receipts_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "workspace",
+            "id"
+          ]
+        }
+      ],
+      "json_invalid": 0,
+      "inline_image_rows": 0,
+      "json_bytes": 30340
+    },
+    "video_workspaces": {
+      "rows": 23,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_video_workspaces_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "json_invalid": 0,
+      "inline_image_rows": 0,
+      "json_bytes": 99027
+    },
+    "workspace_snapshots": {
+      "rows": 370,
+      "indexes": [
+        {
+          "name": "workspace_snapshots_workspace_revision",
+          "unique": false,
+          "origin": "c",
+          "columns": [
+            "workspace",
+            "revision"
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_workspace_snapshots_1",
+          "unique": true,
+          "origin": "pk",
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "json_invalid": 0,
+      "inline_image_rows": 0,
+      "json_bytes": 4563508
+    }
+  },
+  "relations": {
+    "head_item_mismatch": 0,
+    "parent_item_mismatch": 0,
+    "attachment_object_missing": 0,
+    "canvas_job_project_missing": 0,
+    "canvas_plan_project_missing": 0,
+    "studio_link_workspace_missing": 0,
+    "video_job_workspace_missing": 0,
+    "object_id_hash_mismatch": 0,
+    "receipt_snapshot_missing": 0
+  },
+  "plans": {
+    "video_jobs_workspace": [
+      "SCAN studio_video_jobs"
+    ],
+    "renders_workspace": [
+      "SCAN studio_video_renders"
+    ],
+    "canvas_jobs_project": [
+      "SCAN canvas_jobs"
+    ],
+    "canvas_plans_project": [
+      "SCAN canvas_plans"
+    ],
+    "creator_jobs_project": [
+      "SCAN creator_jobs"
+    ],
+    "attachments_owner": [
+      "SCAN attachments"
+    ],
+    "turns_owner": [
+      "SCAN turns"
+    ],
+    "image_jobs_owner": [
+      "SCAN image_jobs"
+    ],
+    "reservations_workspace": [
+      "SCAN studio_reservations"
+    ],
+    "precision_project": [
+      "SCAN video_precision_links"
+    ],
+    "grant_object": [
+      "SCAN media_grants"
+    ],
+    "history_project": [
+      "SEARCH canvas_history USING INDEX sqlite_autoindex_canvas_history_1 (project=?)"
+    ],
+    "receipt_key": [
+      "SEARCH video_workspace_receipts USING INDEX sqlite_autoindex_video_workspace_receipts_1 (workspace=? AND id=?)"
+    ],
+    "versions_scope": [
+      "SEARCH i USING INDEX sqlite_autoindex_media_items_2 (scope=?)",
+      "SEARCH r USING INDEX media_revisions_item_time (item_id=?)",
+      "USE TEMP B-TREE FOR ORDER BY"
+    ],
+    "legacy_file_lookup": [
+      "SEARCH media_revisions USING INDEX media_revisions_item_time (item_id=?)"
+    ]
+  },
+  "object_missing_or_corrupt": 0,
+  "memory_reproductions": {
+    "cross_item_parent_accepted": true,
+    "cross_item_head_accepted": true,
+    "null_text_pk_and_invalid_json_accepted": true,
+    "null_job_workspace_and_data_accepted": true,
+    "fk_check_detects_cross_item_mismatch": false
+  },
+  "proposed_index_plans_memory_only": {
+    "attachments_owner": [
+      "SEARCH attachments USING INDEX attachments_owner (owner=?)"
+    ],
+    "canvas_jobs_project": [
+      "SEARCH canvas_jobs USING INDEX canvas_jobs_project (project=?)"
+    ],
+    "studio_video_jobs_workspace": [
+      "SEARCH studio_video_jobs USING INDEX studio_video_jobs_workspace (workspace=?)"
+    ],
+    "precision_links_project": [
+      "SEARCH video_precision_links USING INDEX precision_links_project (<expr>=?)"
+    ]
+  }
+}

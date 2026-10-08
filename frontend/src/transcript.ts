@@ -47,9 +47,28 @@ export function assistantText(items: ChatItem[], text: string, append: boolean):
   if (last?.kind === 'assistant' && last.status === 'running') {
     next[next.length - 1] = { ...last, text: append ? last.text + text : text };
   } else if (text || append) {
-    next.push({ id: crypto.randomUUID(), kind: 'assistant', text, status: 'running' });
+    const source = next.slice().reverse().find(item => item.kind === 'user')?.creator_context;
+    next.push({ id: crypto.randomUUID(), kind: 'assistant', text, status: 'running', ...(source ? { creator_context: source } : {}) });
   }
   return next;
+}
+
+// Replies inherit only their own preceding user turn, never the selected UI project.
+export function withCreatorContexts(items: ChatItem[]): ChatItem[] {
+  let source: ChatItem['creator_context'];
+  return items.map(item => {
+    if (item.kind === 'user') source = item.creator_context;
+    return item.kind === 'assistant' ? { ...item, creator_context: source } : item;
+  });
+}
+
+export function taskItems(items: ChatItem[], project: string, node: string): ChatItem[] {
+  let source: ChatItem['creator_context'];
+  return items.filter(item => {
+    if (item.kind === 'user') source = item.creator_context;
+    const context = item.creator_context || source;
+    return context?.project_id === project && context.node === node;
+  });
 }
 
 export function finishItems(items: ChatItem[], status: ChatItem['status']): ChatItem[] {

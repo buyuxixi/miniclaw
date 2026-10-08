@@ -1,0 +1,269 @@
+{
+  "backup": "E:\\AI\\miniclaw\\.hermes\\backups\\hardening-20261008-155806",
+  "integrity": "ok",
+  "foreign_key_errors": 0,
+  "before": {
+    "attachments": {
+      "rows": 176,
+      "sha256": "ac4e8516224f5e17aaf9b1457e0d3932bfd3292084486c90146a42f6bc68e127"
+    },
+    "bindings": {
+      "rows": 9,
+      "sha256": "56e421d40b0c6b6cac92e54249c8ca3c8a9b6388d02f1f70053f2621988df989"
+    },
+    "canvas_history": {
+      "rows": 196,
+      "sha256": "8f6624c4266728bb2d930e86e56d8e2556264787e928ca944ecef96dca2b6561"
+    },
+    "canvas_jobs": {
+      "rows": 10,
+      "sha256": "beb55beec54f73c488e5a12162b711b6efd5fa9a3c2726f1be36a67543e03091"
+    },
+    "canvas_plans": {
+      "rows": 8,
+      "sha256": "5cadec30aad61139987e56cf21035274398af8cf3f67a7336224a7a49ad6253a"
+    },
+    "canvas_projects": {
+      "rows": 46,
+      "sha256": "cb15484952dd3d05cf23036a97754a2b5ebc80370eb46e15af5f77c99a6b6471"
+    },
+    "canvas_selections": {
+      "rows": 1,
+      "sha256": "750000b160a53ea5bb8f01498ed37f83f6fa1e9fb4379868386ae1a829ac193c"
+    },
+    "creation_decisions": {
+      "rows": 10,
+      "sha256": "612a00178056bf6a61400d60eed880ddac9dea070b2d966d5b15b5ddb39b6d85"
+    },
+    "creator_jobs": {
+      "rows": 11,
+      "sha256": "f9eb844ab7d959d6ffa535d54c1be8d187d0c78928aad6bafd88f9ede2b4f2db"
+    },
+    "creator_projects": {
+      "rows": 15,
+      "sha256": "a54f100a9cc5b94ac68d93fbbb438e5ed72019a15f1b43478b5d9d5c3aac1923"
+    },
+    "file_objects": {
+      "rows": 72,
+      "sha256": "5fb353fdf93195ccc983919c207d4d0522f1724a9bb362f87e0f22254a5b9daa"
+    },
+    "image_jobs": {
+      "rows": 10,
+      "sha256": "4a41a5b51d27601c45d3518e9d0916f998e7ac34b317e95383e33933f40c0d43"
+    },
+    "media_grants": {
+      "rows": 247,
+      "sha256": "7d7ac1aab0163faff96a65d7dc1ccb5f9fc5a646514d7563ac1915c6fb7d2fe0"
+    },
+    "media_heads": {
+      "rows": 376,
+      "sha256": "9bf6abd89601dc452fcc43eacc4056f4135cc836653d29e8212a93996f6338b2"
+    },
+    "media_items": {
+      "rows": 376,
+      "sha256": "450d6e8e88718527aebcc38a59b82a06064b6c067fe12c433a86def9a610fd42"
+    },
+    "media_revision_objects": {
+      "rows": 356,
+      "sha256": "9122ffe139a033ef95b89366858d8e6453a1adfa5d7564be7114c920d1c2050f"
+    },
+    "media_revisions": {
+      "rows": 533,
+      "sha256": "ab2c06b4359ffd834d16087c939a051397f6d931f463e942fe608d5705a94b9e"
+    },
+    "studio_image_requests": {
+      "rows": 3,
+      "sha256": "0705c0842fb1a396b0c6255655490cd1a72a7bd9fb8c050e318c88d5f24056c2"
+    },
+    "studio_limits": {
+      "rows": 3,
+      "sha256": "9493d0ae052dd942c877a4e5c8b6319e30eb12fb1b8e9e29659840b55ab9f4f3"
+    },
+    "studio_links": {
+      "rows": 9,
+      "sha256": "90b75377bdc9c4e55b4b83209b51142a1b6e308478d373fad6d7298f5a3f4e53"
+    },
+    "studio_projects": {
+      "rows": 1,
+      "sha256": "e9bb0c6676b73cca50b3268f6f830aad27a6571061fef2811eb02ab5931a18c2"
+    },
+    "studio_reservations": {
+      "rows": 7,
+      "sha256": "d55b15b3a9a6ac16003a2b3659175ecc029340c11993731c6acb9ee728e1f237"
+    },
+    "studio_video_jobs": {
+      "rows": 5,
+      "sha256": "b6a09e29a140c8a0c7ab8ab8b0b50cc5f9cb67e1604fabc71e26a72d202b3197"
+    },
+    "studio_video_renders": {
+      "rows": 1,
+      "sha256": "fac335a58915ee3a06f587ab940b94a4b9e88e773c7202bbfb21cc0470c5dff4"
+    },
+    "turns": {
+      "rows": 68,
+      "sha256": "b5f14c419cc0c7cf714b843106ebf79ed3bdb52289a1a2515176d35e04a633ed"
+    },
+    "video_precision_links": {
+      "rows": 26,
+      "sha256": "b46e794e1ee270aedd922b3e317295401ae0982f827d6888bff05ccb3c9de70a"
+    },
+    "video_precision_requests": {
+      "rows": 4,
+      "sha256": "a1ea4d39257f69ff7aa485f8d852be33f97dbea9d23d46de41f03c5140c21666"
+    },
+    "video_workspace_receipts": {
+      "rows": 370,
+      "sha256": "43125dbb546dcc8831020a7f5c3668594cfa99d0b9818fafb4bce415b70a809c"
+    },
+    "video_workspaces": {
+      "rows": 23,
+      "sha256": "c9701b9b451029998d21301d2d03696099e580b7bf4912d5affa793502a669de"
+    },
+    "workspace_snapshots": {
+      "rows": 370,
+      "sha256": "009e08a1cdace43e66c70869044b13eca8f7d5f15c33fdd284e0bca8311549dc"
+    }
+  },
+  "after": {
+    "attachments": {
+      "rows": 176,
+      "sha256": "ac4e8516224f5e17aaf9b1457e0d3932bfd3292084486c90146a42f6bc68e127"
+    },
+    "bindings": {
+      "rows": 9,
+      "sha256": "56e421d40b0c6b6cac92e54249c8ca3c8a9b6388d02f1f70053f2621988df989"
+    },
+    "canvas_history": {
+      "rows": 196,
+      "sha256": "8f6624c4266728bb2d930e86e56d8e2556264787e928ca944ecef96dca2b6561"
+    },
+    "canvas_jobs": {
+      "rows": 10,
+      "sha256": "beb55beec54f73c488e5a12162b711b6efd5fa9a3c2726f1be36a67543e03091"
+    },
+    "canvas_plans": {
+      "rows": 8,
+      "sha256": "5cadec30aad61139987e56cf21035274398af8cf3f67a7336224a7a49ad6253a"
+    },
+    "canvas_projects": {
+      "rows": 46,
+      "sha256": "cb15484952dd3d05cf23036a97754a2b5ebc80370eb46e15af5f77c99a6b6471"
+    },
+    "canvas_selections": {
+      "rows": 1,
+      "sha256": "750000b160a53ea5bb8f01498ed37f83f6fa1e9fb4379868386ae1a829ac193c"
+    },
+    "creation_decisions": {
+      "rows": 10,
+      "sha256": "612a00178056bf6a61400d60eed880ddac9dea070b2d966d5b15b5ddb39b6d85"
+    },
+    "creator_jobs": {
+      "rows": 11,
+      "sha256": "f9eb844ab7d959d6ffa535d54c1be8d187d0c78928aad6bafd88f9ede2b4f2db"
+    },
+    "creator_projects": {
+      "rows": 15,
+      "sha256": "a54f100a9cc5b94ac68d93fbbb438e5ed72019a15f1b43478b5d9d5c3aac1923"
+    },
+    "file_objects": {
+      "rows": 72,
+      "sha256": "5fb353fdf93195ccc983919c207d4d0522f1724a9bb362f87e0f22254a5b9daa"
+    },
+    "image_jobs": {
+      "rows": 10,
+      "sha256": "4a41a5b51d27601c45d3518e9d0916f998e7ac34b317e95383e33933f40c0d43"
+    },
+    "media_grants": {
+      "rows": 247,
+      "sha256": "7d7ac1aab0163faff96a65d7dc1ccb5f9fc5a646514d7563ac1915c6fb7d2fe0"
+    },
+    "media_heads": {
+      "rows": 376,
+      "sha256": "9bf6abd89601dc452fcc43eacc4056f4135cc836653d29e8212a93996f6338b2"
+    },
+    "media_items": {
+      "rows": 376,
+      "sha256": "450d6e8e88718527aebcc38a59b82a06064b6c067fe12c433a86def9a610fd42"
+    },
+    "media_revision_objects": {
+      "rows": 356,
+      "sha256": "9122ffe139a033ef95b89366858d8e6453a1adfa5d7564be7114c920d1c2050f"
+    },
+    "media_revisions": {
+      "rows": 533,
+      "sha256": "ab2c06b4359ffd834d16087c939a051397f6d931f463e942fe608d5705a94b9e"
+    },
+    "studio_image_requests": {
+      "rows": 3,
+      "sha256": "0705c0842fb1a396b0c6255655490cd1a72a7bd9fb8c050e318c88d5f24056c2"
+    },
+    "studio_limits": {
+      "rows": 3,
+      "sha256": "9493d0ae052dd942c877a4e5c8b6319e30eb12fb1b8e9e29659840b55ab9f4f3"
+    },
+    "studio_links": {
+      "rows": 9,
+      "sha256": "90b75377bdc9c4e55b4b83209b51142a1b6e308478d373fad6d7298f5a3f4e53"
+    },
+    "studio_projects": {
+      "rows": 1,
+      "sha256": "e9bb0c6676b73cca50b3268f6f830aad27a6571061fef2811eb02ab5931a18c2"
+    },
+    "studio_reservations": {
+      "rows": 7,
+      "sha256": "d55b15b3a9a6ac16003a2b3659175ecc029340c11993731c6acb9ee728e1f237"
+    },
+    "studio_video_jobs": {
+      "rows": 5,
+      "sha256": "b6a09e29a140c8a0c7ab8ab8b0b50cc5f9cb67e1604fabc71e26a72d202b3197"
+    },
+    "studio_video_renders": {
+      "rows": 1,
+      "sha256": "fac335a58915ee3a06f587ab940b94a4b9e88e773c7202bbfb21cc0470c5dff4"
+    },
+    "turns": {
+      "rows": 68,
+      "sha256": "b5f14c419cc0c7cf714b843106ebf79ed3bdb52289a1a2515176d35e04a633ed"
+    },
+    "video_precision_links": {
+      "rows": 26,
+      "sha256": "b46e794e1ee270aedd922b3e317295401ae0982f827d6888bff05ccb3c9de70a"
+    },
+    "video_precision_requests": {
+      "rows": 4,
+      "sha256": "a1ea4d39257f69ff7aa485f8d852be33f97dbea9d23d46de41f03c5140c21666"
+    },
+    "video_workspace_receipts": {
+      "rows": 370,
+      "sha256": "43125dbb546dcc8831020a7f5c3668594cfa99d0b9818fafb4bce415b70a809c"
+    },
+    "video_workspaces": {
+      "rows": 23,
+      "sha256": "c9701b9b451029998d21301d2d03696099e580b7bf4912d5affa793502a669de"
+    },
+    "workspace_catalog": {
+      "rows": 23,
+      "sha256": "a31c4d6e9069d1389822db04dd02e53b4fada18de17a03287cc2c58ef952135c"
+    },
+    "workspace_snapshots": {
+      "rows": 370,
+      "sha256": "009e08a1cdace43e66c70869044b13eca8f7d5f15c33fdd284e0bca8311549dc"
+    }
+  },
+  "objects_checked": 72,
+  "migrations": [
+    [
+      1,
+      "04782c45ffbc66d4aa6379d258a4d4ab51f020c3fb41d3e3cdca6ba918c68a7c"
+    ],
+    [
+      2,
+      "00f7f341d62f5798a118c9fbd9f1e41b7550a65983a5f297715a48daf7ca0ebe"
+    ],
+    [
+      1001,
+      "0aa6d6a98505ecfc8a32c1ea2066df866ef3876fc898029caca5bbebf3bca5b0"
+    ]
+  ],
+  "native_db_unchanged": true
+}

@@ -1,5 +1,7 @@
 import { readApi, writeApi } from "./management-api";
 import type { Attachment } from "./attachments";
+import type { CreatorCanvasOrigin } from './creator-canvas';
+export interface CanvasImport { attachment: Attachment; session: string; nonce: number; creator?: CreatorCanvasOrigin; design?: import('./photo-design').CanvasDesignRequest; precision?: boolean }
 
 export interface CanvasLayer {
   id: string;
@@ -59,7 +61,15 @@ export interface Version {
   time: number;
   current: boolean;
 }
+export interface ContentVersion {
+  id: string; parent_id: string | null; label: string; time: number; current: boolean;
+}
+export interface VersionPage {items: ContentVersion[]; total: number; page: number; page_size: number}
 export interface CanvasJob {
+  audit?: { estimate_cny: number | null };
+  model?: string;
+  provider_request_id?: string;
+  usage?: Record<string, number>;
   id: string;
   revision: number;
   layer_id: string;
@@ -67,11 +77,13 @@ export interface CanvasJob {
   state: "queued" | "running" | "succeeded" | "failed" | "canceled";
   prompt: string;
   output?: CanvasAsset;
+  review?: { decision: 'keep' | 'reject'; checks: string[]; reason: string; time: number };
   error?: string;
 }
 export interface CanvasCapabilities {
   sam: { state: string; installed: boolean; error?: string };
-  cloud: { configured: boolean; model: string };
+  cloud: { configured: boolean; model: string; reference_cny_per_image?: number | null; price_source?: string; region?: string };
+  image_models?: {provider:string;model:string;label:string;configured:boolean}[];
 }
 export const projectPath = (id: string) =>
   `/api/miniclaw/canvas/projects/${encodeURIComponent(id)}`;
@@ -122,9 +134,9 @@ export async function uploadCanvas(
     data,
   });
 }
-export async function exportBlob(project: string, seq?: number) {
+export async function exportBlob(project: string, seq?: number | string) {
   const response = await fetch(
-    `${window.__HERMES_BASE_PATH__ ?? ""}${projectPath(project)}/export${seq === undefined ? "" : `?seq=${seq}`}`,
+    `${window.__HERMES_BASE_PATH__ ?? ""}${projectPath(project)}/export${seq === undefined ? "" : `?${typeof seq === "string" ? "version_id" : "seq"}=${seq}`}`,
     {
       headers: {
         "X-Hermes-Session-Token": window.__HERMES_SESSION_TOKEN__ ?? "",
@@ -144,13 +156,22 @@ export async function downloadCanvas(project: string) {
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
+export async function previewBlob(project: string, revision: number, document: CanvasDocument) {
+  const response = await fetch(`${window.__HERMES_BASE_PATH__ ?? ''}${projectPath(project)}/preview`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Hermes-Session-Token': window.__HERMES_SESSION_TOKEN__ ?? '' },
+    body: JSON.stringify({ revision, document }), signal: AbortSignal.timeout(30000),
+  });
+  if (!response.ok) { const error = await response.json().catch(() => ({})); throw new Error(error.detail || '构图预览失败'); }
+  return response.blob();
+}
 export async function loadProject(id: string) {
-  const [project, assets, selection, history, jobs] = await Promise.all([
+  const [project, assets, selection, history, jobs, versions] = await Promise.all([
     readApi<Project>(projectPath(id)),
     readApi<CanvasAsset[]>(`${projectPath(id)}/assets`),
     readApi<Selection | null>(`${projectPath(id)}/selection`),
     readApi<Version[]>(`${projectPath(id)}/history`),
     readApi<CanvasJob[]>(`${projectPath(id)}/jobs`),
+    readApi<VersionPage>(`${projectPath(id)}/versions`),
   ]);
-  return { project, assets, selection, history, jobs };
+  return { project, assets, selection, history, jobs, versions: versions.items, versionTotal: versions.total };
 }

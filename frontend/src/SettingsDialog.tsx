@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import {capabilityGroups, skillGroup, type CapabilityGroup} from './capability-groups';
+import { ActionMenu } from './ActionMenu';
 import { readApi, writeApi } from './management-api';
 import { ContextPanel } from './ContextPanel';
 import type { ChatController } from './chat-controller';
@@ -18,6 +20,7 @@ export function SettingsDialog({ controller, chat, onClose, initialTab = 'genera
   const [tab, setTab] = useState<Tab>(initialTab);
   const [skills, setSkills] = useState<Skill[]>();
   const [filter, setFilter] = useState('');
+  const [group,setGroup]=useState<CapabilityGroup|'business'>('business');
   const [memory, setMemory] = useState<MemoryConfig>();
   const [memoryOriginal, setMemoryOriginal] = useState('');
   const memoryDirty = Boolean(memory) && JSON.stringify(memory) !== memoryOriginal;
@@ -68,8 +71,8 @@ export function SettingsDialog({ controller, chat, onClose, initialTab = 'genera
   function viewSkill(skill: Skill) { setEditor({ name: skill.name }); }
   return <dialog ref={root} className="settings-dialog" aria-label="设置" onCancel={event => { event.preventDefault(); if (pendingLeave) setPendingLeave(undefined); else leave(onClose); }} onClick={event => { if (event.target === root.current && !pendingLeave) leave(onClose); }}>
     <div className="settings-layout" inert={Boolean(pendingLeave)}>
-      <aside className="settings-nav"><div className="settings-brand">miniclaw <span>设置</span></div><nav>{tabs.map(item => <button key={item.id} className={tab === item.id ? 'active' : ''} aria-pressed={tab === item.id} disabled={busy} onClick={() => leave(() => { setTab(item.id); setEditor(undefined); setNotice(''); })}><Icon name={(({ general: "settings", skills: "skills", tools: "file", memory: "chat", developer: "edit" } as Record<Tab, IconName>)[item.id])} />{item.label}</button>)}</nav><p>个人工作区 · 本机</p></aside>
-      <div className="settings-content"><header><h2>{tabs.find(item => item.id === tab)?.label}</h2><button className="close-settings" aria-label="关闭设置" disabled={busy} onClick={() => leave(onClose)}><Icon name="close" /></button></header>
+      <aside className="settings-nav"><div className="settings-brand">miniclaw <span>产品宣传工作台</span></div><nav>{tabs.map(item => <button key={item.id} className={tab === item.id ? 'active' : ''} aria-pressed={tab === item.id} disabled={busy} onClick={() => leave(() => { setTab(item.id); setEditor(undefined); setNotice(''); })}><Icon name={(({ general: "settings", skills: "skills", tools: "file", memory: "chat", developer: "edit" } as Record<Tab, IconName>)[item.id])} />{item.label}</button>)}</nav><p>个人工作区 · 本机</p></aside>
+      <div className="settings-content"><header><div><span className="form-eyebrow">工作台设置</span><h2>{tabs.find(item => item.id === tab)?.label}</h2></div><button className="close-settings" aria-label="关闭设置" disabled={busy} onClick={() => leave(onClose)}><Icon name="close" /></button></header>
         <div className="settings-scroll">
           {error && <div className="settings-error" role="alert">{error}</div>}{notice && <div className="settings-notice" role="status">{notice}</div>}
           {loading && <p className="muted">正在加载…</p>}
@@ -81,9 +84,22 @@ export function SettingsDialog({ controller, chat, onClose, initialTab = 'genera
             <div className="settings-note">模型和服务凭据在后端配置中管理。</div>
           </>}
           {tab === 'skills' && <>
-            <div className="settings-intro"><p className="settings-description">在这里管理已安装的流程。使用时，从消息输入框旁的“选择技能”进入；是否能执行还取决于工具与运行环境。</p><div className="settings-intro-actions"><button className="primary-button" disabled={blocked} onClick={() => setEditor({})}>添加技能</button><button disabled={blocked} onClick={() => void action(async () => { const result = await controller.client.request<{ result: { total: number } }>('skills.reload', { session_id: chat.sessionId }); setRevision(v => v + 1); setNotice(`已重新扫描 ${result.result.total} 个可用技能。`); })}>重新扫描</button></div></div>
+            <div className="settings-intro"><p className="settings-description">按宣传工作流程组织技能，执行条件与启用状态分别显示。</p><div className="settings-intro-actions"><button className="primary-button" disabled={blocked} onClick={() => setEditor({})}>添加技能</button><ActionMenu label="更多"><button disabled={blocked} onClick={() => void action(async () => { const result = await controller.client.request<{ result: { total: number } }>('skills.reload', { session_id: chat.sessionId }); setRevision(v => v + 1); setNotice(`已重新扫描 ${result.result.total} 个已安装技能。执行能力以当前对话工具为准。`); })}>重新扫描</button></ActionMenu></div></div>
             {editor ? <SkillEditor key={editor.name ?? 'new'} name={editor.name} controller={controller} sessionId={chat.sessionId} blocked={chat.running || chat.busy || controller.connection !== 'open'} onBack={() => leave(() => { setEditor(undefined); setRevision(v => v + 1); })} onSaved={() => setRevision(v => v + 1)} onDirty={setDirty} onBusy={setBusy} />
-              : <><label className="settings-search"><Icon name="search" /><input name="manage-skill-search" autoComplete="off" aria-label="搜索技能" placeholder="搜索技能名称或用途" value={filter} onChange={event => setFilter(event.target.value)} /></label><div className="list-caption">{skills ? `${skills.length} 个技能 · ${skills.filter(s => s.enabled).length} 个已开启` : ''}</div><div className="skill-list">{skills?.filter(skill => `${skillDetails(skill).title} ${skill.name} ${skill.description}`.toLowerCase().includes(filter.toLowerCase())).map(skill => <article className="skill-card" key={skill.name}><div className="skill-copy"><div className="managed-skill-title"><h3>{skillDetails(skill).title}</h3><span className={`readiness ${skillReadiness(skill, Object.values(chat.info.tools ?? {}).flat()).state}`}>{skillReadiness(skill, Object.values(chat.info.tools ?? {}).flat()).label}</span></div><span className="skill-id" translate="no">{skill.name}</span><p>{skillDetails(skill).description}</p><p className="skill-requirement">{skillReadiness(skill, Object.values(chat.info.tools ?? {}).flat()).reason}</p><button className="text-button" disabled={blocked} onClick={() => void viewSkill(skill)}>查看与编辑</button></div><button role="switch" className="toggle" aria-checked={skill.enabled} aria-label={`启用技能 ${skill.name}`} disabled={blocked} onClick={() => void toggleSkill(skill)}><span /></button></article>)}</div>{skills?.length === 0 && <div className="settings-empty"><span>✧</span><h3>还没有可用技能</h3><p>将技能安装到本机后，点击重新扫描。</p></div>}</>}
+              : <>
+                <label className="settings-search"><Icon name="search"/><input name="manage-skill-search" autoComplete="off" aria-label="搜索技能" placeholder="搜索用途，例如：产品短片、封面、口播" value={filter} onChange={e=>setFilter(e.target.value)}/></label>
+                <div className="capability-filters" aria-label="技能分组"><button aria-pressed={group==='business'} onClick={()=>setGroup('business')}>宣传能力</button>{capabilityGroups.map(g=><button key={g.id} aria-pressed={group===g.id} onClick={()=>setGroup(g.id)}>{g.title}<span>{skills?.filter(s=>skillGroup(s)===g.id).length??0}</span></button>)}</div>
+                <div className="list-caption">{group==='other'?'暂不用于产品宣传的能力，可按需重新启用。':`${skills?.filter(s=>skillGroup(s)!=='other'&&s.enabled).length??0} 个宣传技能已启用 · 工具配置在新对话中应用`}</div>
+                <div className="skill-list">{capabilityGroups.filter(g=>group==='business'?g.id!=='other':g.id===group).map(g=>{
+                  const rows=skills?.filter(s=>skillGroup(s)===g.id&&`${skillDetails(s).title} ${s.name} ${s.description}`.toLowerCase().includes(filter.toLowerCase()))??[];
+                  return rows.length>0&&<section className="capability-section" key={g.id}><header><h3>{g.title}</h3><span>{g.description}</span></header>{rows.map(skill=>{
+                    const state=skillReadiness(skill,Object.values(chat.info.tools??{}).flat());
+                    return <article className="skill-card" key={skill.name}><div className="capability-mark"><Icon name={g.id==='image'?'image':g.id==='video'?'video':g.id==='planning'?'note':'file'}/></div><div className="skill-copy"><div className="managed-skill-title"><h3>{skillDetails(skill).title}</h3><span className={`readiness ${state.state}`}>{skill.name==='hermes-agent'?'系统保留':state.label}</span></div><p>{skillDetails(skill).description}</p><div className="skill-row-actions"><details className="skill-runtime"><summary>运行要求</summary><p className="skill-requirement">{state.reason}</p><code>{skill.name}</code></details><button className="text-button" disabled={blocked} onClick={()=>viewSkill(skill)}>查看与编辑</button></div></div><button role="switch" className="toggle" aria-checked={skill.enabled} aria-label={`启用技能 ${skill.name}`} disabled={blocked||skill.name==='hermes-agent'} onClick={()=>void toggleSkill(skill)}><span/></button></article>;
+                  })}</section>;
+                })}</div>
+                {!loading&&skills&&!skills.some(s=>(group==='business'?skillGroup(s)!=='other':skillGroup(s)===group)&&`${skillDetails(s).title} ${s.name} ${s.description}`.toLowerCase().includes(filter.toLowerCase()))&&<div className="settings-empty"><Icon name="search"/><h3>没有匹配的技能</h3><p>调整关键词或切换分组。</p></div>}
+              </>}
+
           </>}
           {tab === 'tools' && <ToolPreferences loaded={Object.values(chat.info.tools ?? {}).flat()} blocked={chat.running || chat.busy || controller.connection !== 'open'} onBusy={setBusy} />}
           {tab === 'memory' && <>

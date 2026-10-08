@@ -3,7 +3,7 @@ import type { SessionRow } from './types';
 export async function readApi<T>(path: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(`${window.__HERMES_BASE_PATH__ ?? ''}${path}`, {
     headers: { 'X-Hermes-Session-Token': window.__HERMES_SESSION_TOKEN__ ?? '' },
-    cache: 'no-store', signal: signal ?? AbortSignal.timeout(15_000),
+    cache: 'no-store', signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15_000)]) : AbortSignal.timeout(15_000),
   });
   if (!response.ok) throw new Error(`读取失败（HTTP ${response.status}）`);
   return response.json() as Promise<T>;

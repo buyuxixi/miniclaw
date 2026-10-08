@@ -1,0 +1,84 @@
+{
+  "before": {
+    "home": "E:\\AI\\miniclaw\\.hermes",
+    "database_bytes": 750260224,
+    "tables": {
+      "attachments": 176,
+      "bindings": 9,
+      "canvas_history": 196,
+      "canvas_jobs": 10,
+      "canvas_plans": 8,
+      "canvas_projects": 46,
+      "canvas_selections": 1,
+      "creation_decisions": 10,
+      "creator_jobs": 11,
+      "creator_projects": 15,
+      "image_jobs": 10,
+      "studio_image_requests": 3,
+      "studio_limits": 3,
+      "studio_links": 9,
+      "studio_projects": 1,
+      "studio_reservations": 7,
+      "studio_video_jobs": 5,
+      "studio_video_renders": 1,
+      "turns": 68,
+      "video_precision_links": 26,
+      "video_precision_requests": 4,
+      "video_workspace_receipts": 370,
+      "video_workspaces": 23
+    },
+    "inline_images": {
+      "video_workspace_receipts": [
+        328,
+        733581068
+      ],
+      "video_workspaces": [
+        6,
+        13508147
+      ]
+    },
+    "integrity": "ok"
+  },
+  "after": {
+    "home": "E:\\AI\\miniclaw\\.hermes",
+    "database_bytes": 6729728,
+    "tables": {
+      "attachments": 176,
+      "bindings": 9,
+      "canvas_history": 196,
+      "canvas_jobs": 10,
+      "canvas_plans": 8,
+      "canvas_projects": 46,
+      "canvas_selections": 1,
+      "creation_decisions": 10,
+      "creator_jobs": 11,
+      "creator_projects": 15,
+      "file_objects": 72,
+      "image_jobs": 10,
+      "media_grants": 247,
+      "media_heads": 376,
+      "media_items": 376,
+      "media_revision_objects": 356,
+      "media_revisions": 533,
+      "schema_migrations": 2,
+      "studio_image_requests": 3,
+      "studio_limits": 3,
+      "studio_links": 9,
+      "studio_projects": 1,
+      "studio_reservations": 7,
+      "studio_video_jobs": 5,
+      "studio_video_renders": 1,
+      "turns": 68,
+      "video_precision_links": 26,
+      "video_precision_requests": 4,
+      "video_workspace_receipts": 370,
+      "video_workspaces": 23,
+      "workspace_snapshots": 370
+    },
+    "inline_images": {},
+    "integrity": "ok"
+  },
+  "backup": "E:\\AI\\miniclaw\\.hermes\\backups\\storage-20261008-150216-174700",
+  "warnings": [],
+  "historical_limit": "只能迁入仍然存在的历史；旧撤销分支被删除的版本无法恢复。"
+}

@@ -1,13 +1,13 @@
 """Create only missing local configuration; never overwrite credentials."""
 
 import os
-import shutil
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 os.environ["HERMES_HOME"] = str(ROOT / ".hermes")
 
 from hermes_cli.config import atomic_config_write
+from miniclaw_web.bundled_skills import install_bundled_skills
 
 
 def main():
@@ -31,12 +31,7 @@ def main():
         })
     print(f"Configuration: {config_path}")
     print(f"Credentials: {env_path} (values not displayed)")
-    for name in ('product-image-edit', 'canvas-editor'):
-        bundled = ROOT / 'skills' / name / 'SKILL.md'
-        target = home / 'skills' / name / 'SKILL.md'
-        if bundled.is_file() and not target.exists():
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(bundled, target)
+    install_bundled_skills(ROOT, home)
 
 
 if __name__ == "__main__":
