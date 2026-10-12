@@ -14,6 +14,11 @@ test('a malformed or unavailable browser store does not break chat', () => {
   vi.stubGlobal('localStorage', { getItem: () => '{invalid', setItem: () => { throw new Error('quota'); } });
   expect(loadDraft('one')).toEqual({ text: '', attachments: [] }); expect(saveDraft('one', { text: 'keep', attachments: [] })).toBe(false);
 });
+test('ten mixed document references survive a draft reload without being truncated to the former four',()=>{
+  const store=new Map<string,string>();vi.stubGlobal('localStorage',{getItem:(k:string)=>store.get(k),setItem:(k:string,v:string)=>store.set(k,v)});
+  const draft={text:'分析这些资料',attachments:Array.from({length:10},(_,i)=>({id:`doc-${i}`,name:`资料${i}.pdf`,kind:'document' as const,mime:'application/pdf',bytes:500,parse_status:'ready' as const}))};
+  saveDraft('owner',draft);expect(loadDraft('owner')).toEqual(draft);
+});
 test('a bound tool is still missing until this session actually loaded it', () => {
   const skill = { name: 'lesson', enabled: true, binding: { version: 1, required_tools: ['miniclaw_save_artifact'], content_hash: 'sha', current: true } };
   expect(skillReadiness(skill, ['miniclaw_read_file']).state).toBe('missing');

@@ -35,6 +35,17 @@ class StudioTests(unittest.TestCase):
         app.include_router(routes(self.studio,body,lambda _: {'session_key':'owner-one'},lambda _:None))
         self.client=TestClient(app)
     def tearDown(self):self.tmp.cleanup()
+    def test_canonical_canvas_route_serves_relative_assets_and_legacy_links(self):
+        for url in (f'/p/{self.workspace}',f'/studio/index.html?workspace={self.workspace}'):
+            response=self.client.get(url)
+            self.assertEqual(response.status_code,200)
+            self.assertIn('<base href="/studio/">',response.text)
+            self.assertIn('tokens.css?v=',response.text)
+            self.assertIn('interaction.js?v=',response.text)
+            self.assertNotIn('workbench.css',response.text)
+        self.assertEqual(self.client.get('/studio/tokens.css').status_code,200)
+        self.assertEqual(self.client.get('/p/invalid!').status_code,400)
+
     def test_binary_image_upload_object_authorization_and_range(self):
         import hermes_cli.web_server as server
         token=server._SESSION_TOKEN

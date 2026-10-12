@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { expect, test, vi } from 'vitest';
+import { beforeEach, expect, test, vi } from 'vitest';
 import { AppShell } from './AppShell';
 import { creatorBlob, getCreator } from './creator-api';
 import { uploadFile } from './attachments';
@@ -9,6 +9,15 @@ import type { ChatController } from './chat-controller';
 import { loadProject } from './canvas-api';
 import { rememberCanvas, workingCanvas } from './creator-canvas';
 import { readApi, writeApi } from './management-api';
+beforeEach(()=>history.replaceState(null,'','/'));
+
+test('the root opens Chat even when an older version remembered the Creator module',async()=>{
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);localStorage.clear();localStorage.setItem('miniclaw.module','creator');
+  const controller={connection:'open',state:{storedId:'owner',sessionId:'live',running:false,busy:false}};
+  const host=document.createElement('div'),root=createRoot(host);document.body.append(host);
+  try{await act(async()=>root.render(<AppShell controller={controller as unknown as ChatController}/>));expect(host.querySelector('[data-testid=chat]')?.closest('.app-surface')?.hasAttribute('hidden')).toBe(false);expect(host.textContent).not.toContain('节点图片');}
+  finally{await act(async()=>root.unmount());host.remove();localStorage.clear();vi.unstubAllGlobals();}
+});
 vi.mock('./management-api',()=>({writeApi:vi.fn(),readApi:vi.fn().mockResolvedValue([])}));
 const p = {id:'project',name:'商品',revision:3,chat_id:'owner',assets:{source:{id:'raw',name:'product.png'}}};
 const errors=vi.hoisted(()=>({text:''}));
@@ -21,7 +30,7 @@ vi.mock('./creator-api',()=>({creatorBase:'/creator',creatorBlob:vi.fn(),getCrea
 vi.mock('./attachments',()=>({uploadFile:vi.fn(),attachmentBlob:vi.fn().mockResolvedValue(new Blob(['image']))}));
 test('one project hands its source to Chat and Canvas without replacing pending drafts or creating another chat',async()=>{
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);
-  localStorage.clear();localStorage.setItem('miniclaw.module','creator');
+  localStorage.clear();localStorage.setItem('miniclaw.module','creator');history.replaceState(null,'','/?module=creator');
   vi.mocked(creatorBlob).mockResolvedValue(new Blob(['raw']));
   vi.mocked(uploadFile).mockResolvedValue({id:'attached-raw',name:'product.png',kind:'image',mime:'image/png',bytes:3});
   const controller={connection:'open',state:{storedId:'owner',sessionId:'live',running:false,busy:false},newSession:vi.fn(),open:vi.fn()};
@@ -53,7 +62,7 @@ test('one project hands its source to Chat and Canvas without replacing pending 
 
 test('an unfinished canvas resumes from Chat without reuploading and rejects a foreign canvas', async()=>{
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);
-  vi.clearAllMocks();localStorage.clear();localStorage.setItem('miniclaw.module','creator');
+  vi.clearAllMocks();localStorage.clear();localStorage.setItem('miniclaw.module','creator');history.replaceState(null,'','/?module=creator');
   vi.mocked(creatorBlob).mockResolvedValue(new Blob(['raw']));
   vi.mocked(uploadFile).mockResolvedValue({id:'attached-raw',name:'product.png',kind:'image',mime:'image/png',bytes:3});
   vi.mocked(getCreator).mockResolvedValue(p as any);
@@ -110,7 +119,7 @@ test('reload restores an explicitly entered project only for its own conversatio
 
 
 test('the image flow enters the same Chat with its canvas hidden, and switching refuses pending drafts', async()=>{
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);vi.clearAllMocks();localStorage.clear();localStorage.setItem('miniclaw.module','creator');
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);vi.clearAllMocks();localStorage.clear();localStorage.setItem('miniclaw.module','creator');history.replaceState(null,'','/?module=creator');
   rememberCanvas({project:p.id,owner:'owner',image:'raw'},'working');
   vi.mocked(getCreator).mockResolvedValue(p as any);
   vi.mocked(loadProject).mockResolvedValue({project:{id:'working',chat_id:'owner',archived:false}} as any);

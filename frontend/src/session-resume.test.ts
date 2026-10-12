@@ -113,9 +113,9 @@ test('a multi-reference shot can be discussed without sending an undefined image
 
 test('free project Chat keeps normal tools and binds image proposals without executing them',async()=>{
   vi.stubGlobal('window',{__HERMES_SESSION_TOKEN__:'test'});
-  const fetchMock=vi.fn().mockImplementation(async url=>({ok:true,json:async()=>String(url).endsWith('/chat')?{chat_id:'owner'}:String(url).endsWith('/editing-target')?{project:'pixels',revision:3,layer:'bottle'}:{revision:9}}));
+  const fetchMock=vi.fn().mockImplementation(async url=>({ok:true,json:async()=>String(url).endsWith('/chat')?{chat_id:'owner'}:String(url).endsWith('/editing-target')?{project:'pixels',revision:3,layer:'bottle'}:{revision:9,state:{assets:[{id:'target-image'}]}}}));
   vi.stubGlobal('fetch',fetchMock);
-  const controller=new ChatController();controller.workspace={id:'workspace-fixture',target:'shot-two'};
+  const controller=new ChatController();controller.workspace={id:'workspace-fixture',target:'target-image'};
   controller.connection='open';controller.state={...controller.state,sessionId:'live',storedId:'owner',info:{tools:{canvas:['miniclaw_canvas_view'],files:['miniclaw_read_file']}}};
   const request=vi.spyOn(controller.client,'request').mockResolvedValue({});
   expect(await controller.send('继续修改这张图，先给方案')).toBe(true);

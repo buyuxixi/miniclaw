@@ -34,7 +34,8 @@ def main() -> None:
         discover_plugins()
     if any(not validate_toolset(name) for name in selection):
         raise ValueError('Unknown configured toolset; refusing an all-tools fallback')
-    print(','.join(selection))
+    # Native clarify is the schema; miniclaw supplies the durable host callback.
+    print(','.join(dict.fromkeys(selection + ['clarify'])))
 
 
 if __name__ == '__main__':

@@ -1,0 +1,184 @@
+{
+  "version": "formal-seven-joint-v2",
+  "fit_split": "calibration-primary-only",
+  "rule": "per-label top1 grid .50..99; margin>=.20; >=8 records from >=4 base families; zero observed errors; not a probability guarantee; accepted conflict suspends intent/target/scope/role; then fit actual executing consumers",
+  "questions": {
+    "intent": {
+      "enabled": true,
+      "labels": {
+        "discuss": {
+          "threshold": 0.5,
+          "accepted": 40,
+          "families": 4,
+          "errors": 0
+        },
+        "draft": {
+          "threshold": 0.5,
+          "accepted": 90,
+          "families": 9,
+          "errors": 0
+        },
+        "execute_change": {
+          "threshold": 0.5,
+          "accepted": 110,
+          "families": 15,
+          "errors": 0
+        },
+        "unclear": {
+          "threshold": 0.5,
+          "accepted": 40,
+          "families": 4,
+          "errors": 0
+        }
+      },
+      "consumer_records": 280
+    },
+    "target": {
+      "enabled": true,
+      "labels": {
+        "ambiguous": {
+          "threshold": 0.5,
+          "accepted": 34,
+          "families": 15,
+          "errors": 0
+        },
+        "img1": {
+          "threshold": 0.5,
+          "accepted": 35,
+          "families": 13,
+          "errors": 0
+        },
+        "img2": {
+          "threshold": 0.5,
+          "accepted": 17,
+          "families": 13,
+          "errors": 0
+        },
+        "img3": {
+          "threshold": 0.5,
+          "accepted": 11,
+          "families": 11,
+          "errors": 0
+        },
+        "img4": {
+          "threshold": 0.5,
+          "accepted": 11,
+          "families": 11,
+          "errors": 0
+        }
+      },
+      "consumer_records": 110,
+      "consumer_families": 15
+    },
+    "reference_role": {
+      "enabled": true,
+      "labels": {
+        "primary": {
+          "threshold": 0.5,
+          "accepted": 56,
+          "families": 15,
+          "errors": 0
+        }
+      },
+      "consumer_records": 56,
+      "consumer_families": 15
+    },
+    "scope": {
+      "enabled": true,
+      "labels": {
+        "selected_region": {
+          "threshold": 0.5,
+          "accepted": 39,
+          "families": 5,
+          "errors": 0
+        },
+        "whole_object": {
+          "threshold": 0.98,
+          "accepted": 27,
+          "families": 8,
+          "errors": 0
+        }
+      },
+      "consumer_records": 110,
+      "consumer_families": 15
+    },
+    "conflict": {
+      "enabled": true,
+      "labels": {
+        "none": {
+          "threshold": 0.5,
+          "accepted": 280,
+          "families": 32,
+          "errors": 0
+        },
+        "present": {
+          "threshold": 0.5,
+          "accepted": 40,
+          "families": 4,
+          "errors": 0
+        }
+      }
+    },
+    "answer_relation": {
+      "enabled": true,
+      "labels": {
+        "unclear": {
+          "threshold": 0.5,
+          "accepted": 320,
+          "families": 36,
+          "errors": 0
+        }
+      }
+    },
+    "fact_review": {
+      "enabled": true,
+      "labels": {
+        "clear": {
+          "threshold": 0.5,
+          "accepted": 320,
+          "families": 36,
+          "errors": 0
+        }
+      }
+    }
+  },
+  "version_projection": "opaque-sha256-to-null-v1",
+  "profile": "primary",
+  "candidate_counts": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "confirmation_profiles": [
+    "none",
+    "execute",
+    "draft",
+    "target"
+  ],
+  "confirmation_support": {
+    "none": {
+      "records": 165,
+      "families": 22
+    },
+    "execute": {
+      "records": 40,
+      "families": 5
+    },
+    "draft": {
+      "records": 90,
+      "families": 9
+    },
+    "target": {
+      "records": 25,
+      "families": 5
+    }
+  },
+  "checkpoint_sha256": "6c1d336ea08c1bd87292c573a393a7ed0b58bb8ce5b7a60a79cb72456083d041",
+  "question_sha256": "9324cd27c52763868da0cf02d023e5be972e74877befdb003bfe0217510d4f75",
+  "calibration_sha256": "5927229acf9129061e029876fe1d0b2d91195211bc54c15b2fe46c24e8211fb3",
+  "contract": "chat-clarification-v1",
+  "frozen_before_test": true,
+  "name_domain": "Authored literal named attachment commands; host binding separate from model"
+}

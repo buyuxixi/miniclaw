@@ -1,5 +1,7 @@
 """Proposal provenance, owner selection and charge-safe video recovery."""
 import copy
+import base64
+import io
 import json
 import os
 import tempfile
@@ -12,6 +14,8 @@ from miniclaw_web.store import Store
 from miniclaw_web.studio import Studio
 from miniclaw_web.studio_video import StudioVideo
 from miniclaw_web.studio_projects import project_display_name
+from miniclaw_web.attachments import upload
+from PIL import Image
 from tests.test_canvas import Held
 from miniclaw_web.canvas_tools import _turn_session
 
@@ -43,6 +47,27 @@ class StudioPipelineTests(unittest.TestCase):
         self.assertEqual([p['id'] for p in self.studio.list('owner-one')],[self.workspace]);self.assertEqual(self.studio.list('owner-two'),[])
         with self.assertRaises(ValueError):self.studio.create_project({**self.request,'name':'另一个名称'},'owner-one')
         with self.assertRaises(ValueError):self.studio.create_project(self.request,'owner-two')
+
+    def test_plan_carries_owned_prior_images_without_guessing_first_frames(self):
+        pixels=io.BytesIO();Image.new('RGB',(40,60),'green').save(pixels,format='PNG')
+        image=upload(self.store,'owner-one','产品.png',base64.b64encode(pixels.getvalue()).decode())
+        self.store.put('turns',16,{'text':'原始资料','attachments':[image]},'owner-one')
+        later_pixels=io.BytesIO();Image.new('RGB',(40,60),'pink').save(later_pixels,format='PNG')
+        later=upload(self.store,'owner-one','后来.png',base64.b64encode(later_pixels.getvalue()).decode())
+        self.store.put('turns',18,{'text':'稍后上传','attachments':[later]},'owner-one')
+        foreign=upload(self.store,'owner-two','他人.png',base64.b64encode(pixels.getvalue()).decode())
+        self.store.put('turns',15,{'attachments':[foreign]},'owner-two')
+        request={**self.request,'request_id':'plan-with-materials','include_images':True}
+        record=self.studio.create_project(request,'owner-one')
+        self.assertEqual(len(record['state']['assets']),1)
+        asset=record['state']['assets'][0]
+        self.assertEqual(asset['source']['attachmentId'],image['id'])
+        self.assertEqual(asset['source']['sessionId'],'owner-one')
+        self.assertEqual(asset['file'],self.store.media.url(self.store.get('attachments',image['id'],'owner-one')['object_id']))
+        self.assertEqual([s['first'] for s in record['state']['shots']],['',''])
+        self.assertEqual(record['state']['sequence'],[]);self.assertEqual(self.held.calls,[])
+        self.assertEqual(self.studio.create_project(request,'owner-one'),record)
+        self.assertEqual(self.studio.workspaces.get(record['id']),record)
     def test_submission_is_idempotent_and_stale_adoption_rejected(self):
         request=self.ready()
         with patch.dict(os.environ,{'DASHSCOPE_API_KEY':'fixture'}):

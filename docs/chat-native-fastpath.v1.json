@@ -1,0 +1,19 @@
+{
+ "version":"native-fastpath-v1",
+ "provenance":"Author-labelled synthetic development set; two repeats are not independent examples; fixture human reply is revealed only after a real question",
+ "cases":[
+  {"id":"target_rotate","text":"把这张图旋转90度。","selected":null,"reply":"第二张","gold":{"question":"Q_TARGET","effect":"rotate","target":1}},
+  {"id":"target_flip","text":"把这张图水平翻转。","selected":null,"reply":"第一张","gold":{"question":"Q_TARGET","effect":"flip","target":0}},
+  {"id":"vague_yes","text":"可以，开始吧。","reply":"只写一段陶瓷杯宣传口播，突出握持舒适，不生成视频。","gold":{"question":"Q_INTENT","effect":"artifact"}},
+  {"id":"vague_action","text":"这个处理一下。","reply":"把选中的这张图旋转90度。","gold":{"question":"Q_INTENT","effect":"rotate","target":0}},
+  {"id":"no_pending","text":"你看着办吧。","reply":"先讨论产品宣传方向，不修改图片。","gold":{"question":"Q_INTENT","effect":"text"}},
+  {"id":"selected_rotate","text":"把这张图旋转90度。","gold":{"question":null,"effect":"rotate","target":0}},
+  {"id":"explicit_second","text":"把第二张图旋转90度，第一张别动。","selected":null,"gold":{"question":null,"effect":"rotate","target":1}},
+  {"id":"discussion","text":"我们讨论陶瓷杯宣传画面的设计方向，不动图片。","selected":null,"gold":{"question":null,"effect":"text"}},
+  {"id":"review_question","text":"这张图能不能还需要修吗？我们讨论一下","gold":{"question":null,"effect":"text"}},
+  {"id":"quoted_action","text":"客户说把第一张背景改白，我想听你分析他具体想表达什么。","gold":{"question":null,"effect":"text"}},
+  {"id":"narration","text":"写一段陶瓷杯宣传口播，突出握持舒适，不生成视频，保存成文本。","gold":{"question":null,"effect":"artifact"}},
+  {"id":"video_prompt","text":"优化这句视频提示词并保存：陶瓷杯在白色桌面上缓慢旋转，镜头推进。只写提示词，不生成视频。","gold":{"question":null,"effect":"artifact"}},
+  {"id":"unresolved_target","text":"把这张图旋转90度。","selected":null,"reply":"还没决定选哪张。","gold":{"question":"Q_TARGET","effect":"waiting"}}
+ ]
+}

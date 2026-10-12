@@ -1,0 +1,146 @@
+diff --git a/agent/chat_completion_helpers.py b/agent/chat_completion_helpers.py
+index 9a1f83e..d15f4bd 100644
+--- a/agent/chat_completion_helpers.py
++++ b/agent/chat_completion_helpers.py
+@@ -3497,6 +3497,10 @@ class _StreamingCall(StreamingWaitMonitor):
+ 
+     def _call(self):
+         _max_stream_retries = env_int("HERMES_STREAM_RETRIES", 2)
++        recovery = getattr(getattr(self.agent, '_hosted_turn_adapter', None), 'recovery', None)
++        if recovery is not None:
++            # Hosted Chat owns network retries across streaming, fallback and tools.
++            _max_stream_retries = 0
+         # The one stream_options compatibility retry (#9705) is not a network retry and must not
+         # consume the transient budget: on the last attempt (or HERMES_STREAM_RETRIES=0) the
+         # handler returned True and the loop ended with neither a response nor an error set.
+@@ -3512,6 +3516,9 @@ class _StreamingCall(StreamingWaitMonitor):
+                     self._cancel_current_stream_attempt("interrupt_before_stream_retry")
+                     raise InterruptedError("Agent interrupted before stream retry")
+                 try:
++                    if recovery is not None and _stream_attempt > 0:
++                        # Meter the one destination-compatibility repair as well.
++                        recovery.before_request(self.api_kwargs, self.agent._current_api_request_id)
+                     self.result["response"] = _with_stream_emitters(
+                         self.agent, lambda: self._call_wire(stream_attempt_id))
+                     return  # success
+@@ -3728,6 +3735,10 @@ class _StreamingCall(StreamingWaitMonitor):
+         if self.agent._interrupt_requested:  # worker returned early before the monitor saw the flag
+             raise InterruptedError("Agent interrupted during streaming API call (post-worker)")
+         if self.result["error"] is not None:
++            if getattr(getattr(self.agent, '_hosted_turn_adapter', None), 'recovery', None) is not None:
++                # Preserve partial text and let the host stop; incomplete tool JSON
++                # must never become a continuation that dispatches the lost action.
++                raise self.result["error"]
+             if self.deltas_were_sent["yes"]:
+                 return self._partial_stream_stub()
+             raise self.result["error"]
+diff --git a/agent/turn_api_call.py b/agent/turn_api_call.py
+index eea1a42..d49397e 100644
+--- a/agent/turn_api_call.py
++++ b/agent/turn_api_call.py
+@@ -87,6 +87,10 @@ def perform_api_call(
+     _use_streaming = _should_stream(agent)
+ 
+     def _perform_api_call(next_api_kwargs):
++        hosted = getattr(agent, '_hosted_turn_adapter', None)
++        recovery = getattr(hosted, 'recovery', None)
++        if recovery is not None:
++            recovery.before_request(next_api_kwargs, api_request_id)
+         if agent.api_mode == "codex_responses":
+             next_api_kwargs = agent._get_transport().preflight_kwargs(
+                 next_api_kwargs, allow_stream=False, is_github_responses=agent._is_copilot_url(),
+diff --git a/agent/turn_api_error.py b/agent/turn_api_error.py
+index 376098d..befe31d 100644
+--- a/agent/turn_api_error.py
++++ b/agent/turn_api_error.py
+@@ -77,6 +77,16 @@ def handle_api_error(
+     if agent.thinking_callback:
+         agent.thinking_callback("")
+ 
++    hosted = getattr(agent, '_hosted_turn_adapter', None)
++    recovery = getattr(hosted, 'recovery', None)
++    if recovery is not None and getattr(api_error, 'reason', None) in (
++        'request_budget', 'retry_budget', 'token_budget', 'task_timeout',
++    ):
++        recovery.reason = api_error.reason
++        terminal = recovery.failure(messages, api_call_count)
++        agent._persist_session(messages, conversation_history)
++        return _verdict('return', terminal)
++
+     _recovered, active_system_prompt = recover_before_classification(
+         agent, api_error, messages=messages, api_messages=api_messages, api_kwargs=api_kwargs,
+         active_system_prompt=active_system_prompt,
+@@ -113,6 +123,24 @@ def handle_api_error(
+         base_url=str(getattr(agent, "base_url", "") or ""),
+         api_key=getattr(agent, "api_key", None),
+     )
++    if recovery is not None:
++        decision = recovery.on_model_error(api_error, classified.reason.value, api_request_id)
++        if decision == 'retry':
++            return _verdict('continue')
++        if decision == 'fallback':
++            from agent.conversation_loop import _arm_fallback_restart
++            if agent._try_activate_fallback(reason=classified.reason):
++                recovery.notify(f'正在切换备用模型 {agent.model}；已完成步骤会保留。')
++                # Hosted Chat owns its localized progress rail.
++                agent._pending_fallback_notice = None
++                active_system_prompt = _arm_fallback_restart(agent, api_messages, active_system_prompt, _retry)
++                retry_count = compression_attempts = 0
++                return _verdict('break')
++            decision = 'stop'
++        if decision == 'stop':
++            terminal = recovery.failure(messages, api_call_count)
++            agent._persist_session(messages, conversation_history)
++            return _verdict('return', terminal)
+     logger.debug(
+         "Error classified: reason=%s status=%s retryable=%s compress=%s rotate=%s fallback=%s",
+         classified.reason.value, classified.status_code,
+diff --git a/agent/turn_finalizer.py b/agent/turn_finalizer.py
+index c8460bb..15cdf64 100644
+--- a/agent/turn_finalizer.py
++++ b/agent/turn_finalizer.py
+@@ -144,17 +144,22 @@ def _resolve_budget_fallback(
+                 agent._response_was_previewed = True
+             preserved_verification_fallback = True
+         else:
+-            # _handle_max_iterations makes one extra toolless request for a summary.
+-            agent._emit_diagnostic_status(
+-                f"⚠️ Iteration budget exhausted ({api_call_count}/{agent.max_iterations}) "
+-                "— asking model to summarise"
+-            )
+-            if not agent.quiet_mode:
+-                agent._safe_print(
+-                    f"\n⚠️  Iteration budget exhausted ({api_call_count}/{agent.max_iterations}) "
+-                    "— requesting summary...", diagnostic=True,
++            recovery = getattr(getattr(agent, '_hosted_turn_adapter', None), 'recovery', None)
++            if recovery is not None:
++                # No unmetered final-summary request after the hosted budget is spent.
++                final_response = recovery.iteration_limit()
++            else:
++                # _handle_max_iterations makes one extra toolless request for a summary.
++                agent._emit_diagnostic_status(
++                    f"⚠️ Iteration budget exhausted ({api_call_count}/{agent.max_iterations}) "
++                    "— asking model to summarise"
+                 )
+-            final_response = agent._handle_max_iterations(messages, api_call_count)
++                if not agent.quiet_mode:
++                    agent._safe_print(
++                        f"\n⚠️  Iteration budget exhausted ({api_call_count}/{agent.max_iterations}) "
++                        "— requesting summary...", diagnostic=True,
++                    )
++                final_response = agent._handle_max_iterations(messages, api_call_count)
+ 
+     # A kanban worker must record a terminal outcome whether or not a fallback path
+     # was eligible, so the dispatcher learns the worker could not complete. Only the
+diff --git a/agent/turn_tool_round.py b/agent/turn_tool_round.py
+--- a/agent/turn_tool_round.py
++++ b/agent/turn_tool_round.py
+@@ -18,7 +18,7 @@
+ from agent.turn_tool_validation import validate_tool_calls
+ 
+ logger = logging.getLogger("agent.conversation_loop")
+-HOSTED_TURN_ADAPTER_VERSION = 1
++HOSTED_TURN_ADAPTER_VERSION = 2
+ 
+ # Post-response housekeeping tools: a round made only of these mutes tool progress.
+ _HOUSEKEEPING_TOOLS = frozenset({"memory", "todo_list", "skill_manage", "session_search"})

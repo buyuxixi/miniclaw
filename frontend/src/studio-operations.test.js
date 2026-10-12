@@ -15,6 +15,16 @@ function workbench(overrides={}){
   return {app,saved,frames,world,context,flush:()=>{const callbacks=[...frames.values()];frames.clear();callbacks.forEach(cb=>cb());}};
 }
 
+test('selecting nodes leaves the viewport stable and only explicit expansion reveals controls',()=>{
+  const {app}=workbench();const before=JSON.stringify(app.shots);const pan={...app.pan};
+  app.choose('s1');expect(app.composerTask).toBe('video');expect(app.composerExpanded).toBe(false);expect(app.pan).toEqual(pan);
+  let reveals=0;app.$nextTick=fn=>fn();app.revealComposerTarget=()=>reveals++;
+  app.toggleComposer();expect(app.composerExpanded).toBe(true);expect(reveals).toBe(1);
+  app.choose('s2');expect(app.composerExpanded).toBe(false);expect(reveals).toBe(1);
+  expect(JSON.stringify(app.shots)).toBe(before);
+  app.toggleComposer();app.clearCanvasSelection();expect(app.composerExpanded).toBe(false);expect(app.composerTask).toBe('');
+});
+
 test('upward model menus keep an eight pixel gap for short and scrollable lists',()=>{
   const {app}=workbench({innerWidth:1000,innerHeight:800});
   const trigger={getBoundingClientRect:()=>({left:300,top:550,bottom:584})};
@@ -25,6 +35,12 @@ test('upward model menus keep an eight pixel gap for short and scrollable lists'
     expect(550-(top+renderedHeight)).toBe(8);
   }
   expect(style.maxHeight).toBe('400px');
+});
+
+test('mobile expansion reveals the selected preview without panning the desktop camera',()=>{
+  const {app}=workbench({matchMedia:()=>({matches:true})});app.choose('s1');app.$nextTick=fn=>fn();
+  const seen=[];app.$refs.world.querySelectorAll=()=>[{dataset:{objectId:'s1'},scrollIntoView:options=>seen.push(options)}];
+  const pan={...app.pan};app.toggleComposer();expect(seen).toEqual([{block:'start',behavior:'instant'}]);expect(app.pan).toEqual(pan);
 });
 
 test('popup menus flip below high triggers and remain inside a narrow viewport',()=>{
@@ -66,6 +82,24 @@ test('switching image models submits the selected ID and keeps prior result prov
   const calls=[];app.projectApi=async(path,body)=>{calls.push({path,body});return {task:body.task,state:'queued',model:body.model,provider:body.provider,request_id:body.request_id};};
   await app.submitComposer();expect(calls).toHaveLength(1);expect(calls[0].path).toBe('/images');expect(calls[0].body.model).toBe('qwen-image-2.0-pro');expect(calls[0].body.provider).toBe('dashscope');
   a.imageJob.state='succeeded';expect(app.composerProgress()).toBe('结果已生成 · Qwen Image 2.0 Pro');
+});
+
+test('inline prompt advice shares the sole frame with chat and closing only hides it',async()=>{
+  const {app}=workbench();app.projectReady=true;app.flushProject=async()=>{};app.$nextTick=cb=>cb();
+  app.$refs.director={contentWindow:{postMessage(){}}};app.$refs.promptAdvice={getBoundingClientRect:()=>({left:180,top:260,width:604,height:330})};
+  app.choose('s1');await app.openDirectorSelection('optimize');
+  expect(app.promptAdvice).toBe(true);expect(app.assistant).toBe(false);expect(app.composerExpanded).toBe(true);
+  expect(app.promptAdviceStyle).toEqual({left:'180px',top:'260px',width:'604px',height:'330px'});
+  const frame=app.directorUrl;app.closeDirector();expect(app.promptAdvice).toBe(false);expect(app.directorUrl).toBe(frame);
+  await app.openDirectorSelection();expect(app.promptAdvice).toBe(false);expect(app.assistant).toBe(true);expect(app.directorUrl).toBe(frame);
+  await app.openDirectorSelection('discuss','');expect(app.directorContext.target).toBe('');expect(app.directorContext.label).toBe('当前项目');expect(app.directorUrl).toBe(frame);
+});
+
+test('selecting another node hides advice without losing the shared connection or reusing its optimization intent',async()=>{
+  const {app}=workbench();app.projectReady=true;app.flushProject=async()=>{};app.$nextTick=cb=>cb();app.$refs.director={contentWindow:{postMessage(){}}};
+  app.choose('s1');await app.openDirectorSelection('optimize');const frame=app.directorUrl;
+  const next=app.assets[0].id;app.choose(next);expect(app.promptAdvice).toBe(false);expect(app.assistant).toBe(false);expect(app.directorUrl).toBe(frame);
+  await app.openDirectorSelection();expect(app.directorContext.target).toBe(next);expect(app.directorContext.intent).toBe('discuss');expect(app.assistant).toBe(true);
 });
 
 test('workspace menu failures preserve identity and expose retry instead of clearing the list',async()=>{
@@ -314,7 +348,7 @@ test('Chat waits for durable save, exposes failures, and retry navigates using t
   const opening=app.openFullChat(click);expect(app.chatOpening).toBe(true);expect(context.location.href).toBeUndefined();click.currentTarget=null;release();await opening;
   expect(context.location.href).toBe(destination);
   context.location.href=undefined;app.flushProject=async()=>{throw Error('连接中断')};await app.openFullChat({...click,currentTarget:{href:destination}});
-  expect(context.location.href).toBeUndefined();expect(app.projectError).toContain('打开创作助手前保存未完成');expect(app.pendingChatHref).toBe(destination);
+  expect(context.location.href).toBeUndefined();expect(app.projectError).toContain('打开完整对话前保存未完成');expect(app.pendingChatHref).toBe(destination);
   app.flushProject=async()=>{};await app.retryProjectSave();expect(context.location.href).toBe(destination);
 });
 

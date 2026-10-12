@@ -11,5 +11,5 @@ const controller = new ChatController();
 const params=new URLSearchParams(location.search);
 const workspace=params.get('workspace')||params.get('director');
 if(workspace)controller.workspace={id:workspace,target:params.get('target')||undefined};
-if(!params.has('director'))controller.resumeId=params.get('session')||undefined;
+if(!params.has('director'))controller.resumeId=params.get('session')||decodeURIComponent(location.pathname.match(/^\/c\/([^/]+)\/?$/)?.[1]||'')||undefined;
 createRoot(document.getElementById('root')!).render(params.has('director')?<StudioDirector controller={controller}/>:<AppShell controller={controller} />);

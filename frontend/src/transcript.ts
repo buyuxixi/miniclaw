@@ -1,4 +1,5 @@
 import type { ChatItem, HistoryRow, SessionSnapshot } from './types';
+import { visibleUserText } from './turn-display';
 
 export function storedSessionId(snapshot: SessionSnapshot): string {
   const id = snapshot.stored_session_id ?? snapshot.session_key ?? snapshot.info.stored_session_id;
@@ -26,7 +27,7 @@ export function historyItems(rows: HistoryRow[]): ChatItem[] {
       status: row.content == null && row.text == null ? 'unavailable' : resultFailed(row.content ?? text) ? 'error' : 'done',
     }];
     if ((row.role === 'user' || row.role === 'assistant') && text) {
-      return [{ id, kind: row.role, text }];
+      return [{ id, kind: row.role, text: row.role === 'user' ? visibleUserText(text) : text }];
     }
     return [];
   });

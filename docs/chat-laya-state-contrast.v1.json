@@ -1,0 +1,816 @@
+{
+  "version": "laya-state-contrast-v1",
+  "provenance": "Author-labelled synthetic diagnostic set. No production user logs or external blind labels. Same utterance changes state; both variants stay in the same diagnostic partition. Not used for training or recalibration.",
+  "planning": [
+    {
+      "id": "rotate-binding-0",
+      "family": "rotate-binding",
+      "text": "请把这张图旋转90度。",
+      "context": {
+        "selected": null
+      },
+      "gold": {
+        "steps": [],
+        "questions": [
+          "target"
+        ],
+        "targets": []
+      },
+      "categories": [
+        "image"
+      ]
+    },
+    {
+      "id": "rotate-binding-1",
+      "family": "rotate-binding",
+      "text": "请把这张图旋转90度。",
+      "context": {
+        "selected": "img2"
+      },
+      "gold": {
+        "steps": [
+          "edit_image"
+        ],
+        "questions": [],
+        "targets": [
+          "img2"
+        ]
+      },
+      "categories": [
+        "image"
+      ]
+    },
+    {
+      "id": "flip-binding-0",
+      "family": "flip-binding",
+      "text": "把这张图水平翻转。",
+      "context": {
+        "selected": null
+      },
+      "gold": {
+        "steps": [],
+        "questions": [
+          "target"
+        ],
+        "targets": []
+      },
+      "categories": [
+        "image"
+      ]
+    },
+    {
+      "id": "flip-binding-1",
+      "family": "flip-binding",
+      "text": "把这张图水平翻转。",
+      "context": {
+        "selected": "img1"
+      },
+      "gold": {
+        "steps": [
+          "edit_image"
+        ],
+        "questions": [],
+        "targets": [
+          "img1"
+        ]
+      },
+      "categories": [
+        "image"
+      ]
+    },
+    {
+      "id": "discussion-binding-0",
+      "family": "discussion-binding",
+      "text": "旋转这张图会更合适吗？先讨论必要性，不执行。",
+      "context": {
+        "selected": null
+      },
+      "gold": {
+        "steps": [
+          "analyze_plan"
+        ],
+        "questions": [],
+        "targets": []
+      },
+      "categories": [
+        "image"
+      ]
+    },
+    {
+      "id": "discussion-binding-1",
+      "family": "discussion-binding",
+      "text": "旋转这张图会更合适吗？先讨论必要性，不执行。",
+      "context": {
+        "selected": "img2"
+      },
+      "gold": {
+        "steps": [
+          "analyze_plan"
+        ],
+        "questions": [],
+        "targets": []
+      },
+      "categories": [
+        "image"
+      ]
+    },
+    {
+      "id": "quote-binding-0",
+      "family": "quote-binding",
+      "text": "同事说把这张图水平翻转，我只想了解这句话的含义。",
+      "context": {
+        "selected": null
+      },
+      "gold": {
+        "steps": [
+          "analyze_plan"
+        ],
+        "questions": [],
+        "targets": []
+      },
+      "categories": [
+        "image"
+      ]
+    },
+    {
+      "id": "quote-binding-1",
+      "family": "quote-binding",
+      "text": "同事说把这张图水平翻转，我只想了解这句话的含义。",
+      "context": {
+        "selected": "img2"
+      },
+      "gold": {
+        "steps": [
+          "analyze_plan"
+        ],
+        "questions": [],
+        "targets": []
+      },
+      "categories": [
+        "image"
+      ]
+    },
+    {
+      "id": "region-binding-0",
+      "family": "region-binding",
+      "text": "把这里的亮度调高一点，其他位置别动。",
+      "context": {
+        "selected": "img1",
+        "selection": null
+      },
+      "gold": {
+        "steps": [],
+        "questions": [
+          "region"
+        ],
+        "targets": []
+      },
+      "categories": [
+        "image"
+      ]
+    },
+    {
+      "id": "region-binding-1",
+      "family": "region-binding",
+      "text": "把这里的亮度调高一点，其他位置别动。",
+      "context": {
+        "selected": "img1",
+        "selection": {
+          "x": 0,
+          "y": 0,
+          "width": 20,
+          "height": 20
+        }
+      },
+      "gold": {
+        "steps": [
+          "edit_image"
+        ],
+        "questions": [],
+        "targets": [
+          "img1"
+        ]
+      },
+      "categories": [
+        "image"
+      ]
+    },
+    {
+      "id": "answered-region-0",
+      "family": "answered-region",
+      "text": "把这里的杂物去掉。",
+      "context": {
+        "selected": "img1",
+        "confirmed": {}
+      },
+      "gold": {
+        "steps": [],
+        "questions": [
+          "region"
+        ],
+        "targets": []
+      },
+      "categories": [
+        "image"
+      ]
+    },
+    {
+      "id": "answered-region-1",
+      "family": "answered-region",
+      "text": "把这里的杂物去掉。",
+      "context": {
+        "selected": "img1",
+        "confirmed": {
+          "Q_SCOPE": "左下角"
+        },
+        "selection": null
+      },
+      "gold": {
+        "steps": [
+          "edit_image"
+        ],
+        "questions": [],
+        "targets": [
+          "img1"
+        ]
+      },
+      "categories": [
+        "image"
+      ]
+    },
+    {
+      "id": "draft-region-0",
+      "family": "draft-region",
+      "text": "先写一份这里的修图方案，暂时不修图。",
+      "context": {
+        "selection": null
+      },
+      "gold": {
+        "steps": [
+          "write_plan"
+        ],
+        "questions": [],
+        "targets": []
+      },
+      "categories": [
+        "scheme"
+      ]
+    },
+    {
+      "id": "draft-region-1",
+      "family": "draft-region",
+      "text": "先写一份这里的修图方案，暂时不修图。",
+      "context": {
+        "selection": {
+          "description": "左下角"
+        }
+      },
+      "gold": {
+        "steps": [
+          "write_plan"
+        ],
+        "questions": [],
+        "targets": []
+      },
+      "categories": [
+        "scheme"
+      ]
+    },
+    {
+      "id": "pending-purpose-0",
+      "family": "pending-purpose",
+      "text": "可以，就这样做。",
+      "context": {
+        "pending_question": "是否只起草一段产品口播？",
+        "pending_steps": [
+          "optimize_narration"
+        ],
+        "original_user_request": "写一段产品口播文字。"
+      },
+      "gold": {
+        "steps": [
+          "optimize_narration"
+        ],
+        "questions": [],
+        "targets": []
+      },
+      "categories": [
+        "narration"
+      ]
+    },
+    {
+      "id": "pending-purpose-1",
+      "family": "pending-purpose",
+      "text": "可以，就这样做。",
+      "context": {
+        "pending_question": "是否生成一条产品视频候选？",
+        "pending_steps": [
+          "generate_video"
+        ],
+        "original_user_request": "现在生成一条产品视频。"
+      },
+      "gold": {
+        "steps": [
+          "generate_video"
+        ],
+        "questions": [],
+        "targets": []
+      },
+      "categories": [
+        "video"
+      ]
+    },
+    {
+      "id": "pending-target-0",
+      "family": "pending-target",
+      "text": "第二张。",
+      "context": {
+        "selected": null,
+        "pending_question": "旋转哪张图片？",
+        "pending_steps": [
+          "edit_image"
+        ],
+        "original_user_request": "把这张图旋转90度。",
+        "confirmed": {
+          "Q_TARGET": "第二张"
+        }
+      },
+      "gold": {
+        "steps": [
+          "edit_image"
+        ],
+        "questions": [],
+        "targets": [
+          "img2"
+        ]
+      },
+      "categories": [
+        "image"
+      ]
+    },
+    {
+      "id": "pending-target-1",
+      "family": "pending-target",
+      "text": "第二张。",
+      "context": {
+        "selected": null,
+        "pending_question": null,
+        "pending_steps": []
+      },
+      "gold": {
+        "steps": [],
+        "questions": [
+          "intent"
+        ],
+        "targets": []
+      },
+      "categories": []
+    },
+    {
+      "id": "unresolved-answer-0",
+      "family": "unresolved-answer",
+      "text": "我还没决定。",
+      "context": {
+        "selected": null,
+        "pending_question": "这次旋转哪张图片？",
+        "pending_steps": [
+          "edit_image"
+        ],
+        "original_user_request": "把这张图旋转90度。"
+      },
+      "gold": {
+        "steps": [],
+        "questions": [
+          "target"
+        ],
+        "targets": []
+      },
+      "categories": [
+        "image"
+      ]
+    },
+    {
+      "id": "unresolved-answer-1",
+      "family": "unresolved-answer",
+      "text": "我还没决定。",
+      "context": {
+        "selected": null,
+        "pending_question": "你想讨论还是实际修改图片？",
+        "pending_steps": []
+      },
+      "gold": {
+        "steps": [],
+        "questions": [
+          "intent"
+        ],
+        "targets": []
+      },
+      "categories": [
+        "image"
+      ]
+    },
+    {
+      "id": "prompt-or-media-0",
+      "family": "prompt-or-media",
+      "text": "就按这段提示词来。",
+      "context": {
+        "pending_question": "是否优化视频提示词文字？",
+        "pending_steps": [
+          "optimize_video_prompt"
+        ],
+        "original_user_request": "优化桌面台灯慢慢转动的视频提示词，只要文字。"
+      },
+      "gold": {
+        "steps": [
+          "optimize_video_prompt"
+        ],
+        "questions": [],
+        "targets": []
+      },
+      "categories": [
+        "video_prompt"
+      ]
+    },
+    {
+      "id": "prompt-or-media-1",
+      "family": "prompt-or-media",
+      "text": "就按这段提示词来。",
+      "context": {
+        "pending_question": "是否按该提示词生成视频候选？",
+        "pending_steps": [
+          "generate_video"
+        ],
+        "original_user_request": "使用已确认的提示词生成视频。"
+      },
+      "gold": {
+        "steps": [
+          "generate_video"
+        ],
+        "questions": [],
+        "targets": []
+      },
+      "categories": [
+        "video"
+      ]
+    },
+    {
+      "id": "compound-text-0",
+      "family": "compound-text",
+      "text": "写一段台灯宣传口播，再写对应的视频提示词，只要两段文字。",
+      "context": {
+        "selected": null
+      },
+      "gold": {
+        "steps": [
+          "optimize_narration",
+          "optimize_video_prompt"
+        ],
+        "questions": [],
+        "targets": []
+      },
+      "categories": [
+        "narration",
+        "video_prompt"
+      ]
+    },
+    {
+      "id": "compound-text-1",
+      "family": "compound-text",
+      "text": "写一段台灯宣传口播，再写对应的视频提示词，只要两段文字。",
+      "context": {
+        "selected": "img2"
+      },
+      "gold": {
+        "steps": [
+          "optimize_narration",
+          "optimize_video_prompt"
+        ],
+        "questions": [],
+        "targets": []
+      },
+      "categories": [
+        "narration",
+        "video_prompt"
+      ]
+    },
+    {
+      "id": "compound-generation-0",
+      "family": "compound-generation",
+      "text": "先优化口播，再按这个口播生成视频候选。",
+      "context": {
+        "selected": null
+      },
+      "gold": {
+        "steps": [
+          "optimize_narration",
+          "generate_video"
+        ],
+        "questions": [],
+        "targets": []
+      },
+      "categories": [
+        "narration",
+        "video"
+      ]
+    },
+    {
+      "id": "compound-generation-1",
+      "family": "compound-generation",
+      "text": "先优化口播，再按这个口播生成视频候选。",
+      "context": {
+        "selected": "img1"
+      },
+      "gold": {
+        "steps": [
+          "optimize_narration",
+          "generate_video"
+        ],
+        "questions": [],
+        "targets": []
+      },
+      "categories": [
+        "narration",
+        "video"
+      ]
+    },
+    {
+      "id": "image-prompt-0",
+      "family": "image-prompt",
+      "text": "重写台灯主图的图片生成提示词，给我文字，暂不出图。",
+      "context": {
+        "selected": null
+      },
+      "gold": {
+        "steps": [
+          "optimize_image_prompt"
+        ],
+        "questions": [],
+        "targets": []
+      },
+      "categories": [
+        "image_prompt"
+      ]
+    },
+    {
+      "id": "image-prompt-1",
+      "family": "image-prompt",
+      "text": "重写台灯主图的图片生成提示词，给我文字，暂不出图。",
+      "context": {
+        "selected": "img2"
+      },
+      "gold": {
+        "steps": [
+          "optimize_image_prompt"
+        ],
+        "questions": [],
+        "targets": []
+      },
+      "categories": [
+        "image_prompt"
+      ]
+    },
+    {
+      "id": "explicit-target-0",
+      "family": "explicit-target",
+      "text": "请把第二张图旋转90度，第一张别动。",
+      "context": {
+        "selected": null
+      },
+      "gold": {
+        "steps": [
+          "edit_image"
+        ],
+        "questions": [],
+        "targets": [
+          "img2"
+        ]
+      },
+      "categories": [
+        "image"
+      ]
+    },
+    {
+      "id": "explicit-target-1",
+      "family": "explicit-target",
+      "text": "请把第二张图旋转90度，第一张别动。",
+      "context": {
+        "selected": "img1"
+      },
+      "gold": {
+        "steps": [
+          "edit_image"
+        ],
+        "questions": [],
+        "targets": [
+          "img2"
+        ]
+      },
+      "categories": [
+        "image"
+      ]
+    },
+    {
+      "id": "confirmed-purpose-0",
+      "family": "confirmed-purpose",
+      "text": "这张图的背景太暗，给我调整建议。",
+      "context": {
+        "selected": null
+      },
+      "gold": {
+        "steps": [
+          "analyze_plan"
+        ],
+        "questions": [],
+        "targets": []
+      },
+      "categories": [
+        "image"
+      ]
+    },
+    {
+      "id": "confirmed-purpose-1",
+      "family": "confirmed-purpose",
+      "text": "这张图的背景太暗，给我调整建议。",
+      "context": {
+        "selected": "img1",
+        "confirmed": {
+          "Q_EXECUTION": "只整理方案"
+        },
+        "draft_only": true
+      },
+      "gold": {
+        "steps": [
+          "analyze_plan"
+        ],
+        "questions": [],
+        "targets": []
+      },
+      "categories": [
+        "image"
+      ]
+    }
+  ],
+  "native": [
+    {
+      "id": "rotate-missing",
+      "text": "请把这张图旋转90度。",
+      "selected": null,
+      "reply": "第二张",
+      "gold": {
+        "question": "Q_TARGET",
+        "effect": "rotate",
+        "target": 1
+      }
+    },
+    {
+      "id": "rotate-bound",
+      "text": "请把这张图旋转90度。",
+      "selected": 1,
+      "reply": null,
+      "gold": {
+        "question": null,
+        "effect": "rotate",
+        "target": 1
+      }
+    },
+    {
+      "id": "flip-missing",
+      "text": "把这张图水平翻转。",
+      "selected": null,
+      "reply": "第二张",
+      "gold": {
+        "question": "Q_TARGET",
+        "effect": "flip",
+        "target": 1
+      }
+    },
+    {
+      "id": "flip-bound",
+      "text": "把这张图水平翻转。",
+      "selected": 1,
+      "reply": null,
+      "gold": {
+        "question": null,
+        "effect": "flip",
+        "target": 1
+      }
+    },
+    {
+      "id": "discuss-missing",
+      "text": "旋转这张图会更合适吗？先讨论必要性，不执行。",
+      "selected": null,
+      "reply": null,
+      "gold": {
+        "question": null,
+        "effect": "text",
+        "target": 1
+      }
+    },
+    {
+      "id": "discuss-bound",
+      "text": "旋转这张图会更合适吗？先讨论必要性，不执行。",
+      "selected": 1,
+      "reply": null,
+      "gold": {
+        "question": null,
+        "effect": "text",
+        "target": 1
+      }
+    },
+    {
+      "id": "quote-missing",
+      "text": "同事说把这张图水平翻转，我只想了解这句话的含义。",
+      "selected": null,
+      "reply": null,
+      "gold": {
+        "question": null,
+        "effect": "text",
+        "target": 1
+      }
+    },
+    {
+      "id": "quote-bound",
+      "text": "同事说把这张图水平翻转，我只想了解这句话的含义。",
+      "selected": 1,
+      "reply": null,
+      "gold": {
+        "question": null,
+        "effect": "text",
+        "target": 1
+      }
+    },
+    {
+      "id": "prompt-missing",
+      "text": "写一份台灯的视频提示词并保存，只要文字，不生成视频。",
+      "selected": null,
+      "reply": null,
+      "gold": {
+        "question": null,
+        "effect": "artifact",
+        "target": 1
+      }
+    },
+    {
+      "id": "prompt-bound",
+      "text": "写一份台灯的视频提示词并保存，只要文字，不生成视频。",
+      "selected": 1,
+      "reply": null,
+      "gold": {
+        "question": null,
+        "effect": "artifact",
+        "target": 1
+      }
+    },
+    {
+      "id": "compound-missing",
+      "text": "台灯口播和视频提示词各写一段，分别标注口播和视频提示词，合成一份文本保存，不生成媒体。",
+      "selected": null,
+      "reply": null,
+      "gold": {
+        "question": null,
+        "effect": "artifact",
+        "target": 1
+      }
+    },
+    {
+      "id": "compound-bound",
+      "text": "台灯口播和视频提示词各写一段，分别标注口播和视频提示词，合成一份文本保存，不生成媒体。",
+      "selected": 1,
+      "reply": null,
+      "gold": {
+        "question": null,
+        "effect": "artifact",
+        "target": 1
+      }
+    },
+    {
+      "id": "resume-rotate",
+      "text": "请把这张图旋转90度。",
+      "selected": null,
+      "reply": "第二张",
+      "gold": {
+        "question": "Q_TARGET",
+        "effect": "rotate",
+        "target": 1
+      }
+    },
+    {
+      "id": "resume-waiting",
+      "text": "请把这张图旋转90度。",
+      "selected": null,
+      "reply": "还没决定选哪张。",
+      "gold": {
+        "question": "Q_TARGET",
+        "effect": "waiting",
+        "target": 1
+      }
+    }
+  ],
+  "known_regressions": [
+    "rotation binding and unknown target answer repeat known failure families"
+  ],
+  "limitations": [
+    "Planning includes paid media and region editing only as previews. Native executes local fixture rotate/flip and saves text.",
+    "Native text content checked separately; existence alone does not prove content quality."
+  ]
+}

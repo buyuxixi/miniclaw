@@ -1,3 +1,4 @@
+import '../public/studio/project-name.js';
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { App } from "./App";
 import type { ChatController } from "./chat-controller";
@@ -23,11 +24,12 @@ const StudioHome = lazy(() => import('./StudioHome'));
 export function AppShell({ controller }: { controller: ChatController }) {
   const workspaceRoute = new URLSearchParams(location.search).has('workspace');
   const [module, setModule] = useState<"chat" | "canvas" | "creator" | "home">(() =>
-    new URLSearchParams(location.search).has('projects') ? 'home' : new URLSearchParams(location.search).has('workspace') || new URLSearchParams(location.search).has('chat') ? 'chat' : localStorage.getItem("miniclaw.module") === "creator"
+    location.pathname==='/projects'||new URLSearchParams(location.search).has('projects') ? 'home' : (location.pathname||'').startsWith('/c/')||new URLSearchParams(location.search).has('workspace') || new URLSearchParams(location.search).has('chat') ? 'chat' : new URLSearchParams(location.search).get('module') === "creator"
       ? "creator"
-      : localStorage.getItem("miniclaw.module") === "canvas"
+      : new URLSearchParams(location.search).get('module') === "canvas"
         ? "canvas"
-        : localStorage.getItem('miniclaw.module') === 'chat' ? 'chat' : 'home',
+        // Chat is the home surface; projects are opened explicitly.
+        : 'chat',
   );
   const [canvasLoaded, setCanvasLoaded] = useState(module === "canvas");
   const [creatorLoaded, setCreatorLoaded] = useState(module === "creator");
@@ -136,6 +138,9 @@ export function AppShell({ controller }: { controller: ChatController }) {
   function show(value: "chat" | "canvas" | "creator" | "home") {
     setModule(value);
     localStorage.setItem("miniclaw.module", value);
+    if(value==='home')history.replaceState(null,'','/projects');
+    if(value==='chat')history.replaceState(null,'',studioChatHref(controller.state.storedId,controller.workspace?.id,controller.workspace?.target));
+    if(value==='creator'||value==='canvas')history.replaceState(null,'','/?module='+value);
     if (value === "canvas") setCanvasLoaded(true);
     if (value === "creator") setCreatorLoaded(true);
   }
@@ -253,7 +258,7 @@ export function AppShell({ controller }: { controller: ChatController }) {
           settingsNonce={settingsNonce}
         />
       </div>
-      <div className="app-surface" hidden={module !== 'home'}><Suspense fallback={<p className="project-home-loading" role="status">正在读取项目…</p>}><StudioHome active={module==='home'} onChat={newFreeChat}/></Suspense></div>
+      <div className="app-surface" hidden={module !== 'home'}><Suspense fallback={<p className="project-home-loading" role="status">正在读取项目…</p>}><StudioHome active={module==='home'} onChat={newFreeChat} onBack={()=>show('chat')}/></Suspense></div>
       {creatorLoaded && (
         <div className="app-surface" hidden={module !== "creator"}>
           <Suspense

@@ -3,6 +3,8 @@ import { readApi, searchSessions, writeApi } from './management-api';
 import type { ChatController } from './chat-controller';
 import type { ChatState, SessionRow } from './types';
 import { Icon } from './Icon';
+import '../public/studio/project-name.js';
+import type {StudioProject} from './StudioHome';
 
 export function SidebarSessions({ controller, chat, onSelect, projectName }: { controller: ChatController; chat: ChatState; onSelect: () => void; projectName?: string }) {
   const [query, setQuery] = useState('');
@@ -16,6 +18,20 @@ export function SidebarSessions({ controller, chat, onSelect, projectName }: { c
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
   const [archived, setArchived] = useState(false);
+  const [projects, setProjects] = useState<StudioProject[]>([]);
+  useEffect(()=>{
+    if(controller.connection!=='open')return;
+    const abort=new AbortController();
+    void readApi<StudioProject[]>('/api/workspaces',abort.signal).then(rows=>{
+      if(!abort.signal.aborted&&Array.isArray(rows))setProjects(rows);
+    }).catch(()=>{});
+    return()=>abort.abort();
+  },[controller.connection,chat.sessions]);
+  const projectFor=(row:SessionRow)=>projects.find(project=>project.chat_id===row.id);
+  const sessionTitle=(row:SessionRow)=>{
+    const project=projectFor(row);
+    return project&&(!row.title||/^(画布助手|导演助手|未命名)/.test(row.title))?shortStudioName(project.name):row.title||row.preview||'未命名对话';
+  };
   const blocked = chat.running || chat.busy || saving || controller.connection !== 'open';
   useEffect(() => {
     const abort = new AbortController();
@@ -68,7 +84,7 @@ export function SidebarSessions({ controller, chat, onSelect, projectName }: { c
         {editing === row.id ? <form className="rename-form" onSubmit={event => { event.preventDefault(); void rename(row); }}>
           <input name="session-title" autoComplete="off" aria-label="对话名称" autoFocus maxLength={200} value={name} onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') setEditing(''); }} />
           <button aria-label="保存对话名称" disabled={blocked || !name.trim()}><Icon name="check" size={16} /></button><button type="button" aria-label="取消改名" onClick={() => setEditing('')}><Icon name="close" size={16} /></button>
-        </form> : <><button className="session" title={row.title || row.preview} disabled={blocked} onClick={() => { void controller.open(row.id); onSelect(); }}><span>{row.title || row.preview || '未命名对话'}</span></button>
+        </form> : <><button className="session" title={sessionTitle(row)} disabled={blocked} onClick={() => { void controller.open(row.id); onSelect(); }}>{projectFor(row)&&<Icon name="folder" size={14}/>}<span>{sessionTitle(row)}</span></button>
           <button className="session-action" title="重命名" aria-label={`重命名 ${row.title || '未命名对话'}`} disabled={blocked} onClick={() => { setEditing(row.id); setName(row.title || ''); }}><Icon name="edit" size={15} /></button></>}
         {editing !== row.id && <button className="session-action archive-action" title={archived ? '恢复到最近对话' : '归档，可在归档记录中恢复'} aria-label={`${archived ? '恢复' : '归档'} ${row.title || '未命名对话'}`} disabled={blocked} onClick={() => void archive(row)}><Icon name={archived ? 'plus' : 'archive'} size={15} /></button>}
       </div>)}

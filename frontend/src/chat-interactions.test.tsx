@@ -7,14 +7,14 @@ import { SettingsDialog } from './SettingsDialog';
 import { SkillEditor } from './SkillEditor';
 import { MemoryEditor } from './MemoryEditor';
 import { App } from './App';
-import { attachmentBlob, uploadFile, type Attachment } from './attachments';
+import { attachmentBlob, uploadFile, cancelUpload, documentStatus, retryDocument, type Attachment } from './attachments';
 import { readApi, writeApi } from './management-api';
 import type { ChatController } from './chat-controller';
 import type { ChatState } from './types';
 import { exportBlob } from './canvas-api';
 
 vi.mock('./management-api', () => ({ readApi: vi.fn(), writeApi: vi.fn() }));
-vi.mock('./attachments', () => ({ uploadFile: vi.fn(), attachmentBlob: vi.fn() }));
+vi.mock('./attachments', () => ({ uploadFile: vi.fn(), attachmentBlob: vi.fn(), cancelUpload:vi.fn().mockResolvedValue(undefined), documentStatus:vi.fn(),retryDocument:vi.fn() }));
 vi.mock('./canvas-api', async () => ({...(await vi.importActual('./canvas-api')),exportBlob:vi.fn()}));
 let host: HTMLDivElement;
 let root: Root;
@@ -39,6 +39,7 @@ beforeEach(() => {
   vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:fixture'), revokeObjectURL: vi.fn() });
   vi.resetAllMocks();
   vi.mocked(attachmentBlob).mockResolvedValue(new Blob(['fixture']));
+  vi.mocked(cancelUpload).mockResolvedValue(undefined);
   vi.mocked(exportBlob).mockResolvedValue(new Blob(['working'],{type:'image/png'}));
   vi.mocked(readApi).mockResolvedValue({ ready: true, images: true });
   vi.mocked(writeApi).mockResolvedValue({});
@@ -59,6 +60,46 @@ test('conversation restoration protects input until its owner and draft are read
   expect(input().disabled).toBe(false);
 });
 
+test('pending questions keep the composer visible and preserve its draft when task control is not accepted',async()=>{
+  localStorage.setItem('miniclaw.draft.owner-a',JSON.stringify({text:'先取消这轮任务',attachments:[]}));
+  const pending={id:'pending',task_id:'task',version:1,status:'pending' as const,deadline:2000000000,questions:[{id:'color',question:'选择颜色',choices:['红色','蓝色'],multi_select:false}]};
+  const c={...controller(),connect:vi.fn(),dispose:vi.fn(),subscribe:()=>()=>{},state:{...chat(),clarifications:[pending]},cancelClarification:vi.fn().mockResolvedValue(undefined)} as unknown as ChatController;
+  vi.mocked(c.send).mockResolvedValue(false);
+  await act(async()=>root.render(<App controller={c}/>));
+  expect(input().closest('[hidden]')).toBeNull();
+  expect(input().disabled).toBe(false);
+  expect(input().value).toBe('先取消这轮任务');
+  await click('发送');
+  expect(c.send).toHaveBeenCalledWith('先取消这轮任务',undefined,[]);
+  expect(input().value).toBe('先取消这轮任务');
+  expect(JSON.parse(localStorage.getItem('miniclaw.draft.owner-a')!).text).toBe('先取消这轮任务');
+  await click('修改需求');
+  expect(c.cancelClarification).toHaveBeenCalledWith(pending,true);
+  expect(input().value).toBe('先取消这轮任务');
+});
+
+test('pending text control bypasses cover preparation',async()=>{
+  const pending={id:'pending',task_id:'task',version:1,status:'pending' as const,deadline:2000000000,questions:[{id:'color',question:'选择颜色',choices:['红色'],multi_select:false}]};
+  const c=controller();const state={...chat(),clarifications:[pending]};
+  vi.mocked(readApi).mockResolvedValue({ready:false,images:false});
+  localStorage.setItem('miniclaw.draft.owner-a',JSON.stringify({text:'取消任务',skill:'canvas-editor',attachments:[]}));
+  await act(async()=>root.render(<Composer controller={c} chat={state} creatorContext={{project_id:'product',node:'cover'}} onManage={()=>{}}/>));
+  await click('发送');
+  expect(c.send).toHaveBeenCalledWith('取消任务',undefined,[]);
+  expect(exportBlob).not.toHaveBeenCalled();expect(uploadFile).not.toHaveBeenCalled();
+});
+
+test('pending attachment drafts remain intact until the user chooses how to change the task',async()=>{
+  const c=controller();const state={...chat(),clarifications:[{id:'pending',task_id:'task',version:1,status:'pending' as const,deadline:2000000000,questions:[{id:'color',question:'选择颜色',choices:['红色'],multi_select:false}]}]};
+  localStorage.setItem('miniclaw.draft.owner-a',JSON.stringify({text:'修改要求',attachments:[fakeAttachment]}));
+  await act(async()=>root.render(<Composer controller={c} chat={state} onManage={()=>{}}/>));
+  await click('发送');
+  expect(c.send).not.toHaveBeenCalled();
+  expect(host.textContent).toContain('附件草稿已保留');
+  expect(input().value).toBe('修改要求');
+  expect(JSON.parse(localStorage.getItem('miniclaw.draft.owner-a')!).attachments).toEqual([fakeAttachment]);
+});
+
 test('IME Enter and Shift+Enter cannot send; ordinary Enter sends the persisted draft', async () => {
   localStorage.setItem('miniclaw.draft.owner-a', JSON.stringify({ text: '你好', attachments: [] }));
   const c = controller();
@@ -71,6 +112,65 @@ test('IME Enter and Shift+Enter cannot send; ordinary Enter sends the persisted 
   await act(async () => input().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })));
   expect(c.send).toHaveBeenCalledWith('你好', undefined, []);
   expect(input().value).toBe('');
+});
+
+test('a chosen skill stays visible and is submitted on every turn until explicitly replaced or removed', async () => {
+  vi.stubGlobal('requestAnimationFrame',(fn:()=>void)=>{fn();return 1;});
+  vi.mocked(readApi).mockImplementation(async url=>url==='/api/miniclaw/skills' ?
+    ['product-video-plan','product-prompt-optimize'].map(name=>({name,enabled:true,description:'',binding:{version:1,current:true,required_tools:[],content_hash:'fixture'}})) :
+    {ready:true,images:true});
+  const c=controller();
+  vi.mocked(c.client.request).mockResolvedValue({skills:{'/product-video-plan':{},'/product-prompt-optimize':{}},categories:[]});
+  localStorage.setItem('miniclaw.draft.owner-a',JSON.stringify({text:'策划第一镜',attachments:[fakeAttachment]}));
+  const render=(text?:string,nonce=1)=>root.render(<Composer key="owner-a" controller={c} chat={chat()} onManage={()=>{}} suggestion={text?{text,nonce}:undefined}/>);
+  const choose=async(title:string)=>{
+    await act(async()=>[...host.querySelectorAll('article')].find(e=>e.querySelector('h3')?.textContent===title)!.querySelector('button')!.click());
+  };
+  await act(async()=>render());
+  await click('选择技能'); await choose('产品短片策划');
+  await click('发送');
+  expect(c.send).toHaveBeenNthCalledWith(1,'策划第一镜','product-video-plan',[fakeAttachment]);
+  expect(input().value).toBe('');
+  expect(host.querySelector('.attachments')).toBeNull();
+  expect(host.querySelector('.composer-skill')?.textContent).toContain('产品短片策划');
+  expect(JSON.parse(localStorage.getItem('miniclaw.draft.owner-a')!).skill).toBe('product-video-plan');
+  await act(async()=>render('继续调整第二镜',2));
+  await click('发送');
+  expect(c.send).toHaveBeenNthCalledWith(2,'继续调整第二镜','product-video-plan',[]);
+  expect(button('当前技能：产品短片策划')).toBeDefined();
+  await click('当前技能：产品短片策划'); await choose('产品宣传提示词优化');
+  await act(async()=>render('只优化运动要求',3));
+  await click('发送');
+  expect(c.send).toHaveBeenNthCalledWith(3,'只优化运动要求','product-prompt-optimize',[]);
+  await click('移除技能');
+  await act(async()=>render('普通讨论',4));
+  await click('发送');
+  expect(c.send).toHaveBeenNthCalledWith(4,'普通讨论',undefined,[]);
+  expect(host.querySelector('.composer-skill')).toBeNull();
+  expect(JSON.parse(localStorage.getItem('miniclaw.draft.owner-a')!).skill).toBeUndefined();
+});
+
+test('retained skills restore only in their own conversation and survive a refused send', async () => {
+  const c=controller();
+  localStorage.setItem('miniclaw.draft.owner-a',JSON.stringify({text:'继续策划',skill:'product-video-plan',attachments:[]}));
+  const render=(owner:string)=>root.render(<Composer key={owner} controller={c} chat={chat(owner)} onManage={()=>{}}/>);
+  await act(async()=>render('owner-a'));
+  await click('发送');
+  await act(async()=>render('owner-b'));
+  expect(host.querySelector('.composer-skill')).toBeNull();
+  expect(JSON.parse(localStorage.getItem('miniclaw.draft.owner-b')!).skill).toBeUndefined();
+  await act(async()=>render('owner-a'));
+  expect(host.querySelector('.composer-skill')?.textContent).toContain('产品短片策划');
+  vi.mocked(c.send).mockResolvedValueOnce(false);
+  await act(async()=>root.render(<Composer key="owner-a" controller={c} chat={chat()} onManage={()=>{}} suggestion={{text:'未发送要求',nonce:1}}/>));
+  await click('发送');
+  expect(input().value).toBe('未发送要求');
+  expect(JSON.parse(localStorage.getItem('miniclaw.draft.owner-a')!).skill).toBe('product-video-plan');
+  await click('移除技能');
+  await act(async()=>render('owner-b'));
+  await act(async()=>render('owner-a'));
+  expect(host.querySelector('.composer-skill')).toBeNull();
+  expect(input().value).toBe('未发送要求');
 });
 
 test('project reply adoption extracts only the spoken main and preserves the source revision', async () => {
@@ -186,10 +286,15 @@ test('paste and drop upload owned files; remove only cancels that reference and 
   const imageFile = new File(['image'], 'fixture.png', { type: 'image/png' });
   const textFile = new File(['note'], 'note.md', { type: 'text/markdown' });
   await files('paste', [imageFile]); await files('drop', [textFile]);
-  expect(uploadFile).toHaveBeenNthCalledWith(1, 'owner-a', imageFile);
-  expect(uploadFile).toHaveBeenNthCalledWith(2, 'owner-a', textFile);
-  expect(host.querySelector('a[aria-label="预览 fixture.png"]')).not.toBeNull();
-  expect(host.querySelector('a[download="note.md"]')).not.toBeNull();
+  expect(uploadFile).toHaveBeenNthCalledWith(1, 'owner-a', imageFile, expect.objectContaining({signal:expect.any(AbortSignal)}));
+  expect(uploadFile).toHaveBeenNthCalledWith(2, 'owner-a', textFile, expect.objectContaining({signal:expect.any(AbortSignal)}));
+  expect(host.querySelector('button[aria-label="预览 fixture.png"]')).not.toBeNull();
+  expect(host.querySelector('a[aria-label="预览 fixture.png"]')).toBeNull();
+  expect(host.querySelector('a[download="note.md"]')).toBeNull();
+  await click('查看附件 note.md');
+  expect(document.querySelector('.attachment-details a[download="note.md"]')).not.toBeNull();
+  await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label="关闭附件详情"]')!.click());
+  expect(document.querySelector('.attachment-details')).toBeNull();
   await click('移除 fixture.png');
   await click('发送');
   expect(c.send).toHaveBeenCalledWith('', undefined, [text]);
@@ -206,6 +311,55 @@ test('a completed upload cannot enter a different session after the Composer unm
   await act(async () => finish(fakeAttachment));
   expect(host.textContent).not.toContain('fixture.png');
   expect(JSON.parse(localStorage.getItem('miniclaw.draft.owner-b')!).attachments).toEqual([]);
+  expect(JSON.parse(localStorage.getItem('miniclaw.draft.owner-a')!).attachments).toEqual([fakeAttachment]);
+});
+
+test('removing a document during pending parse retry keeps it removed after the old response',async()=>{
+  const doc:Attachment={id:'old-doc',name:'旧手册.pdf',kind:'document',mime:'application/pdf',bytes:9000,parse_status:'partial'};
+  localStorage.setItem('miniclaw.draft.owner-a',JSON.stringify({text:'保留这条要求',attachments:[doc]}));
+  vi.mocked(documentStatus).mockResolvedValue({parse_status:'partial',warnings:[{code:'page',message:'部分内容无法读取',source:{page:2}}]});
+  let finish!:(value:Partial<Attachment>)=>void;
+  vi.mocked(retryDocument).mockImplementation(()=>new Promise(resolve=>{finish=resolve;}));
+  const c=controller();await act(async()=>root.render(<Composer controller={c} chat={chat()} onManage={()=>{}}/>));
+  await click('查看附件 旧手册.pdf');
+  await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('.attachment-details button')].find(b=>b.textContent==='重试解析')!.click());
+  expect(retryDocument).toHaveBeenCalledExactlyOnceWith('owner-a','old-doc');
+  await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label="关闭附件详情"]')!.click());
+  await click('移除 旧手册.pdf');
+  expect(host.querySelector('.attachment-card')).toBeNull();
+  await act(async()=>finish({parse_status:'ready',chunks:50}));
+  expect(host.querySelector('.attachment-card')).toBeNull();expect(input().value).toBe('保留这条要求');
+  expect(JSON.parse(localStorage.getItem('miniclaw.draft.owner-a')!).attachments).toEqual([]);
+  expect(c.send).not.toHaveBeenCalled();
+});
+
+test('a mixed batch continues after one failure and retries only that file',async()=>{
+  let fail=true;vi.mocked(uploadFile).mockImplementation(async(_owner,file)=>{if(file.name==='bad.txt'&&fail)throw new Error('网络中断');return {id:file.name,name:file.name,kind:'text',mime:'text/plain',bytes:3};});
+  const c=controller();await act(async()=>root.render(<Composer controller={c} chat={chat()} onManage={()=>{}}/>));
+  await files('drop',['first.txt','bad.txt','last.txt'].map(name=>new File(['abc'],name)));
+  expect(host.querySelectorAll('.composer-attachments .attachment-card')).toHaveLength(2);expect(host.textContent).toContain('网络中断');
+  await click('发送');expect(c.send).not.toHaveBeenCalled();
+  fail=false;await click('重试上传 bad.txt');
+  expect(vi.mocked(uploadFile).mock.calls.map(([,f])=>f.name)).toEqual(['first.txt','bad.txt','last.txt','bad.txt']);
+  expect(host.querySelectorAll('.composer-attachments .attachment-card')).toHaveLength(3);
+  await click('发送');expect(c.send).toHaveBeenCalledWith('',undefined,expect.arrayContaining([expect.objectContaining({id:'last.txt'}),expect.objectContaining({id:'bad.txt'})]));
+});
+
+test('pending files reserve capacity immediately and two workers bound concurrent uploads',async()=>{
+  vi.mocked(uploadFile).mockImplementation(()=>new Promise(()=>{}));
+  const c=controller();await act(async()=>root.render(<Composer controller={c} chat={chat()} onManage={()=>{}}/>));
+  const event=(names:string[])=>{const e=new Event('drop',{bubbles:true,cancelable:true});Object.defineProperty(e,'dataTransfer',{value:{files:names.map(name=>new File(['abc'],name)),types:['Files']}});return e;};
+  await act(async()=>{host.querySelector('form')!.dispatchEvent(event(Array.from({length:6},(_,i)=>`${i}.txt`)));host.querySelector('form')!.dispatchEvent(event(Array.from({length:5},(_,i)=>`next${i}.txt`)));});
+  expect(uploadFile).toHaveBeenCalledTimes(2);expect(host.querySelectorAll('.attachment-upload-row')).toHaveLength(6);expect(host.textContent).toContain('每轮最多10个附件');
+});
+
+test('canceling an active upload aborts its request and a late success cannot enter the draft',async()=>{
+  let finish!:(attachment:Attachment)=>void;let signal!:AbortSignal;
+  vi.mocked(uploadFile).mockImplementation((_owner,_file,options)=>{signal=options!.signal!;options!.onSession?.('upload-id');return new Promise(resolve=>finish=resolve);});
+  const c=controller();await act(async()=>root.render(<Composer controller={c} chat={chat()} onManage={()=>{}}/>));
+  await files('drop',[new File(['abc'],'pending.txt')]);await click('取消上传 pending.txt');
+  expect(signal.aborted).toBe(true);expect(cancelUpload).toHaveBeenCalledWith('owner-a','upload-id');
+  await act(async()=>finish(fakeAttachment));expect(JSON.parse(localStorage.getItem('miniclaw.draft.owner-a')!).attachments).toEqual([]);
 });
 
 test('refused sending preserves the text and attachments for correction', async () => {
@@ -231,9 +385,9 @@ test('image editing is sent from the Chat composer with the exact working contex
   expect(c.send).toHaveBeenCalledExactlyOnceWith('让背景柔和一点','canvas-editor',[fakeAttachment],canvas,creator);
 });
 
-  test('four existing attachments cannot silently become five when preparing the working image', async () => {
+  test('ten existing attachments cannot silently become eleven when preparing the working image', async () => {
     const c=controller(), state={...chat(),info:{tools:{canvas:['miniclaw_canvas_propose']}}};
-    const attachments=Array.from({length:4},(_,i)=>({...fakeAttachment,id:'text-'+i,kind:'text',mime:'text/plain'}));
+    const attachments=Array.from({length:10},(_,i)=>({...fakeAttachment,id:'text-'+i,kind:'text',mime:'text/plain'}));
     localStorage.setItem('miniclaw.draft.owner-a',JSON.stringify({text:'修改背景',attachments}));
     await act(async()=>root.render(<Composer controller={c} chat={state} creatorContext={{project_id:'p',node:'cover'}} canvasContext={{project_id:'w',revision:1,layer_id:'l',mode:'plan'}} onManage={()=>{}}/>));
     await click('发送');
@@ -349,5 +503,5 @@ test('workspace association waits until the new Chat is durably linked',async()=
   expect(host.querySelector('.conversation-loading')?.textContent).toBe('正在读取对话…');expect(host.querySelector('.welcome')).toBeNull();
   c.state={...c.state,workspaceConnecting:false};await act(async()=>root.render(<App controller={c}/>));
   expect(readApi).toHaveBeenCalledWith('/api/workspaces?owner=owner-a');expect(c.workspace).toEqual({id:'fixture-workspace',target:'shot-one'});
-  expect(host.querySelector('.canvas-return')?.textContent).toBe('返回画布');expect(host.querySelector('.canvas-return')?.getAttribute('title')).toBe('测试项目');expect(host.querySelector('.topbar-title')?.textContent).toBe('测试项目');expect(host.querySelector('.welcome h1')).toBeNull();
+  expect(host.querySelector('.canvas-return')?.textContent).toBe('打开画布');expect(host.querySelector('.canvas-return')?.getAttribute('href')).toBe('/p/fixture-workspace');expect(host.querySelector('.canvas-return')?.getAttribute('title')).toBe('测试项目');expect(host.querySelector('.topbar-title')?.textContent).toBe('测试项目');expect(host.querySelector('.welcome h1')?.textContent).toBe('测试项目');
 });

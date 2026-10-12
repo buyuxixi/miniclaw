@@ -1,0 +1,129 @@
+diff --git a/agent/turn_api_call.py b/agent/turn_api_call.py
+--- a/agent/turn_api_call.py
++++ b/agent/turn_api_call.py
+@@ -91,6 +91,20 @@
+         recovery = getattr(hosted, 'recovery', None)
+         if recovery is not None:
+             recovery.before_request(next_api_kwargs, api_request_id)
++        trace = getattr(hosted, 'trace', None)
++        if trace is not None and recovery is None:
++            trace.model_start(next_api_kwargs, api_request_id, None)
++        try:
++            result = _dispatch_api_call(next_api_kwargs)
++        except BaseException as error:
++            if trace is not None:
++                trace.model_error(error)
++            raise
++        if trace is not None:
++            trace.model_done(result)
++        return result
++
++    def _dispatch_api_call(next_api_kwargs):
+         if agent.api_mode == "codex_responses":
+             next_api_kwargs = agent._get_transport().preflight_kwargs(
+                 next_api_kwargs, allow_stream=False, is_github_responses=agent._is_copilot_url(),
+diff --git a/agent/turn_api_error.py b/agent/turn_api_error.py
+--- a/agent/turn_api_error.py
++++ b/agent/turn_api_error.py
+@@ -83,6 +83,9 @@
+         'request_budget', 'retry_budget', 'token_budget', 'task_timeout',
+     ):
+         recovery.reason = api_error.reason
++        trace = getattr(hosted, 'trace', None)
++        if trace is not None:
++            trace.decision('stop', api_error.reason, budget=recovery.snapshot())
+         terminal = recovery.failure(messages, api_call_count)
+         agent._persist_session(messages, conversation_history)
+         return _verdict('return', terminal)
+@@ -123,6 +126,13 @@
+         base_url=str(getattr(agent, "base_url", "") or ""),
+         api_key=getattr(agent, "api_key", None),
+     )
++    agent._invoke_api_request_error_hook(
++        task_id=effective_task_id, turn_id=turn_id, api_request_id=api_request_id,
++        api_call_count=api_call_count, api_start_time=api_start_time, api_kwargs=api_kwargs,
++        error_type=type(api_error).__name__, error_message=str(api_error), status_code=status_code,
++        retry_count=retry_count, max_retries=max_retries, retryable=classified.retryable,
++        reason=classified.reason.value,
++    )
+     if recovery is not None:
+         decision = recovery.on_model_error(api_error, classified.reason.value, api_request_id)
+         if decision == 'retry':
+@@ -130,6 +140,9 @@
+         if decision == 'fallback':
+             from agent.conversation_loop import _arm_fallback_restart
+             if agent._try_activate_fallback(reason=classified.reason):
++                trace = getattr(hosted, 'trace', None)
++                if trace is not None:
++                    trace.decision('fallback', classified.reason.value, provider=agent.provider, model=agent.model, budget=recovery.snapshot())
+                 recovery.notify(f'正在切换备用模型 {agent.model}；已完成步骤会保留。')
+                 # Hosted Chat owns its localized progress rail.
+                 agent._pending_fallback_notice = None
+@@ -138,6 +151,9 @@
+                 return _verdict('break')
+             decision = 'stop'
+         if decision == 'stop':
++            trace = getattr(hosted, 'trace', None)
++            if trace is not None:
++                trace.decision('stop', recovery.reason or classified.reason.value, budget=recovery.snapshot())
+             terminal = recovery.failure(messages, api_call_count)
+             agent._persist_session(messages, conversation_history)
+             return _verdict('return', terminal)
+@@ -147,13 +163,7 @@
+         classified.retryable, classified.should_compress,
+         classified.should_rotate_credential, classified.should_fallback,
+     )
+-    agent._invoke_api_request_error_hook(
+-        task_id=effective_task_id, turn_id=turn_id, api_request_id=api_request_id,
+-        api_call_count=api_call_count, api_start_time=api_start_time, api_kwargs=api_kwargs,
+-        error_type=type(api_error).__name__, error_message=str(api_error), status_code=status_code,
+-        retry_count=retry_count, max_retries=max_retries, retryable=classified.retryable,
+-        reason=classified.reason.value,
+-    )
++
+ 
+     _recovered, recovered_with_pool = recover_after_classification(
+         agent, api_error, classified, _retry, status_code=status_code, error_context=error_context,
+diff --git a/agent/chat_completion_helpers.py b/agent/chat_completion_helpers.py
+--- a/agent/chat_completion_helpers.py
++++ b/agent/chat_completion_helpers.py
+@@ -3422,6 +3422,9 @@
+             # Nothing streamed yet: drop the usage extension for this session and re-open.
+             self.agent._stream_options_unsupported = True
+             self._compat_retries = 1
++            trace = getattr(getattr(self.agent, '_hosted_turn_adapter', None), 'trace', None)
++            if trace is not None:
++                trace.decision('retry', 'stream_options_unsupported', next_attempt=2)
+             logger.info("Endpoint rejected stream_options (HTTP %s); retrying without it for this session.",
+                         getattr(e, "status_code", None))
+             self._cancel_current_stream_attempt("stream_options_rejected_retry")
+@@ -3519,10 +3522,17 @@
+                     if recovery is not None and _stream_attempt > 0:
+                         # Meter the one destination-compatibility repair as well.
+                         recovery.before_request(self.api_kwargs, self.agent._current_api_request_id)
++                    elif _stream_attempt > 0:
++                        trace = getattr(getattr(self.agent, '_hosted_turn_adapter', None), 'trace', None)
++                        if trace is not None:
++                            trace.model_start(self.api_kwargs, self.agent._current_api_request_id, None)
+                     self.result["response"] = _with_stream_emitters(
+                         self.agent, lambda: self._call_wire(stream_attempt_id))
+                     return  # success
+                 except Exception as e:
++                    trace = getattr(getattr(self.agent, '_hosted_turn_adapter', None), 'trace', None)
++                    if trace is not None:
++                        trace.model_error(e)
+                     self._close_managed_stream()
+                     if not self._handle_stream_error(e, _stream_attempt, _max_stream_retries):
+                         return
+diff --git a/agent/turn_tool_round.py b/agent/turn_tool_round.py
+--- a/agent/turn_tool_round.py
++++ b/agent/turn_tool_round.py
+@@ -18,7 +18,7 @@
+ from agent.turn_tool_validation import validate_tool_calls
+ 
+ logger = logging.getLogger("agent.conversation_loop")
+-HOSTED_TURN_ADAPTER_VERSION = 2
++HOSTED_TURN_ADAPTER_VERSION = 3
+ 
+ # Post-response housekeeping tools: a round made only of these mutes tool progress.
+ _HOUSEKEEPING_TOOLS = frozenset({"memory", "todo_list", "skill_manage", "session_search"})

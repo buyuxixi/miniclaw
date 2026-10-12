@@ -2,7 +2,7 @@ import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import {test,expect} from 'vitest';
 function production(base){
- const window={film:()=>base};runInNewContext(readFileSync(new URL('../public/studio/production.js',import.meta.url),'utf8'),{window,URLSearchParams,location:{search:''},setInterval,clearInterval,Promise});return window.film();
+ return runInNewContext(readFileSync(new URL('../public/studio/production.js',import.meta.url),'utf8')+';withStudioProduction(base)',{base,URLSearchParams,location:{search:''},setInterval,clearInterval,Promise});
 }
 test('failed workspace read always exits the outer loading state',async()=>{
  const app=production({async loadSharedProject(){this.projectError='offline';this.projectReady=false;}});

@@ -1,6 +1,7 @@
 import '../public/studio/project-name.js';
 import './chat-workbench.css';
-import { useEffect, useRef, useState } from "react";
+import './chat-trace-navigation.css';
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChatController } from "./chat-controller";
 import { useChat } from "./use-chat";
 import { Message } from "./Message";
@@ -11,6 +12,7 @@ import {StudioProjectDialog} from './StudioProjectDialog';
 import { SidebarSessions } from "./SidebarSessions";
 import { SettingsDialog } from "./SettingsDialog";
 import { Composer } from "./Composer";
+import { ClarificationCards } from './ClarificationCards';
 import { Icon, type IconName } from "./Icon";
 import { ImageWorkspace } from "./ImageWorkspace";
 import type { Attachment } from "./attachments";
@@ -21,6 +23,9 @@ import { creationNodes } from './creator-api';
 import { loadDraft } from './drafts';
 import { taskItems } from './transcript';
 import { ProjectConversationRecords } from './ProjectConversationRecords';
+import { TraceView } from './TraceView';
+import { useChatTrace } from './use-chat-trace';
+import { withTraceHistory } from './trace-history';
 
 export function App({
   controller,
@@ -58,11 +63,18 @@ export function App({
   active?: boolean;
 }) {
   const chat = useChat(controller);
+  const [conversationView, setConversationView] = useState<'conversation' | 'trace'>(() =>
+    new URLSearchParams(location.search).get('view') === 'trace' ? 'trace' : 'conversation');
+  const trace = useChatTrace(chat.storedId, active && conversationView === 'trace' && !chat.workspaceConnecting && Boolean(chat.items.length || chat.running),
+    chat.running, `${chat.items.length}:${chat.status}:${chat.error}`);
+  const traceSteps = useMemo(() => withTraceHistory(chat.items, trace.steps), [chat.items, trace.steps]);
+  const traceReturnScroll = useRef(0);
   const [linkedProject,setLinkedProject]=useState<StudioProject>();
   const [creatingProject,setCreatingProject]=useState<{owner:string;message?:string}>();
   const [associationError,setAssociationError]=useState('');
   const [associationLoading,setAssociationLoading]=useState(false);
   const contextLoading=chat.busy||chat.workspaceConnecting||associationLoading;
+  const initialWelcome=useRef(!controller.resumeId&&!controller.workspace&&!localStorage.getItem('miniclaw.selected'));
   const workspaceId=linkedProject?.chat_id===chat.storedId?linkedProject.id:undefined;
   useEffect(()=>{
     let canceled=false;setLinkedProject(undefined);setAssociationError('');setAssociationLoading(false);
@@ -75,7 +87,9 @@ export function App({
       const requested=new URLSearchParams(location.search).get('workspace');
       const selected=projects.find(p=>p.id===requested)||projects[0];
       setLinkedProject(selected);setAssociationLoading(false);controller.workspace=selected?{id:selected.id,...(selected.id===requested&&previousTarget?{target:previousTarget}:{})}:undefined;
-      const url=new URL(location.href);url.searchParams.set('chat','1');
+      const url=new URL(studioChatHref(chat.storedId),location.origin);
+      if(new URLSearchParams(location.search).get('view')==='trace')url.searchParams.set('view','trace');
+      if(selected?.id===requested)for(const key of ['target','message']){const value=new URLSearchParams(location.search).get(key);if(value)url.searchParams.set(key,value);}
       if(selected)url.searchParams.set('workspace',selected.id);else {url.searchParams.delete('workspace');url.searchParams.delete('target');url.searchParams.delete('message');}
       history.replaceState(null,'',url);
     }).catch(e=>{if(!canceled){controller.workspace=undefined;setAssociationLoading(false);setAssociationError(e.message);}});
@@ -85,7 +99,7 @@ export function App({
     if(!workspaceId){setCreatingProject({owner:chat.storedId,message:item});return;}
     const result=await saveStudioIdea(workspaceId,chat.storedId,item);
     const object=result.events.at(-1)?.object;
-    location.href=`/studio/index.html?workspace=${encodeURIComponent(workspaceId)}${object?`&focus=${encodeURIComponent(object)}`:''}`;
+    location.href=studioCanvasHref(workspaceId,object);
   }
   const [workingImage, setWorkingImage] = useState<WorkingImageContext>();
   const [projectImage, setProjectImage] = useState<ProjectImageReference>();
@@ -111,6 +125,17 @@ export function App({
   const [imageEditor, setImageEditor] = useState<{ initial?: Attachment }>();
   const [following, setFollowing] = useState(true);
   const conversation = useRef<HTMLDivElement>(null);
+  function switchConversationView(next: 'conversation' | 'trace') {
+    if (next === conversationView) return;
+    if (next === 'trace') traceReturnScroll.current = conversation.current?.scrollTop ?? 0;
+    setConversationView(next);
+    const url = new URL(location.href);
+    if (next === 'trace') url.searchParams.set('view', 'trace'); else url.searchParams.delete('view');
+    history.replaceState(null, '', url);
+  }
+  useEffect(() => {
+    if (conversationView === 'conversation' && conversation.current) conversation.current.scrollTop = traceReturnScroll.current;
+  }, [conversationView]);
   const followRef = useRef(true);
   const [sidebar, setSidebar] = useState(false);
   const [settings, setSettings] = useState(false);
@@ -121,7 +146,7 @@ export function App({
   const sourceJumped = useRef(false);
   const sourceMessage = controller.workspace ? new URLSearchParams(location.search).get('message') : null;
   useEffect(() => {
-    if (sourceJumped.current || !sourceMessage || !/^row-\d+$/.test(sourceMessage)) return;
+    if (conversationView !== 'conversation' || sourceJumped.current || !sourceMessage || !/^row-\d+$/.test(sourceMessage)) return;
     const message = [...(conversation.current?.querySelectorAll<HTMLElement>('[data-project-message]') ?? [])].find(el => el.dataset.projectMessage === sourceMessage);
     if (message) {
       sourceJumped.current = true;
@@ -132,7 +157,7 @@ export function App({
       message.focus({preventScroll:true});
       message.style.outline='2px solid var(--accent, #bba7f4)';
     }
-  }, [chat.items,sourceMessage]);
+  }, [chat.items,sourceMessage,conversationView]);
   const connected = chat.connection === "open";
   const title =
     chat.info.title ||
@@ -159,14 +184,15 @@ export function App({
     }
   }, [settingsNonce]);
   useEffect(() => {
-    if (followRef.current && !recordView && !recordReturn.current && !pendingJump.current)
+    if (conversationView === 'conversation' && followRef.current && !recordView && !recordReturn.current && !pendingJump.current)
       bottom.current?.scrollIntoView({ behavior: "instant" });
-  }, [chat.items.length, chat.items.at(-1)?.text, chat.running, visibleItems.length, creatorContext?.id, creatorContext?.node, conversationScope]);
+  }, [chat.items.length, chat.items.at(-1)?.text, chat.running, visibleItems.length, creatorContext?.id, creatorContext?.node, conversationScope,conversationView]);
   useEffect(() => {
     if (!active) return;
     followRef.current = true;
     setFollowing(true);
-    conversation.current?.scrollTo({ top: conversation.current.scrollHeight });
+    if (conversationView === 'conversation') conversation.current?.scrollTo({ top: conversation.current.scrollHeight });
+    traceReturnScroll.current = 0;
   }, [chat.storedId,active]);
   function follow() {
     followRef.current = true;
@@ -174,7 +200,7 @@ export function App({
     bottom.current?.scrollIntoView({ behavior: "smooth" });
   }
   useEffect(() => {
-    if (recordView || !projectActive || !conversation.current) return;
+    if (conversationView !== 'conversation' || recordView || !projectActive || !conversation.current) return;
     const panel = conversation.current;
     if (pendingJump.current) {
       const message = [...panel.querySelectorAll<HTMLElement>('[data-project-message]')].find(el => el.dataset.projectMessage === pendingJump.current);
@@ -184,7 +210,7 @@ export function App({
         recordReturn.current = false;
       }
     } else if (recordReturn.current) { panel.scrollTop = recordScroll.current; recordReturn.current = false; }
-  }, [recordView,conversationScope,chat.storedId]);
+  }, [recordView,conversationScope,chat.storedId,conversationView]);
 
   return (
     <div className={`app-shell chat-workbench ${projectActive ? `project-studio ${resultsOpen ? 'studio-show-work' : 'studio-show-chat'}` : ''}`}>
@@ -221,7 +247,7 @@ export function App({
           <Icon name="plus" />
           新建对话
         </button>
-        {onCreator && <button className="sidebar-home" onClick={()=>{location.href='/?projects=1';}}><Icon name="folder"/>创作项目</button>}
+        {onCreator && <button className="sidebar-home" onClick={onCreator}><Icon name="folder"/>创作项目</button>}
         <SidebarSessions
           controller={controller}
           chat={chat}
@@ -250,7 +276,7 @@ export function App({
       </aside>
       </>}
       <div className={`chat-center ${projectActive ? 'has-project' : ''}`}>
-      <main className="main-panel">
+      <main className={`main-panel${conversationView==='trace'?' is-trace':''}${initialWelcome.current&&contextLoading&&!visibleItems.length?' welcome-loading':''}`}>
         <header className="topbar">
           <button
             className="mobile-menu icon-button"
@@ -263,7 +289,7 @@ export function App({
           {projectActive && <button className="project-back-overview" onClick={onCreator}>看板</button>}
           {projectActive && onProjectDetails && <button className="project-back-overview" onClick={onProjectDetails}>资料</button>}
           <span className="topbar-right">
-            {workspaceId&&!projectActive&&<a className="workspace-mode canvas-return" href={`/studio/index.html?workspace=${workspaceId}`} title={linkedProject?.name}><Icon name="image" size={15}/><span>返回画布</span></a>}
+            {workspaceId&&!projectActive&&<a className="workspace-mode canvas-return" href={studioCanvasHref(workspaceId)} title={linkedProject?.name}><Icon name="image" size={15}/><span>打开画布</span></a>}
             {!projectActive && !workspaceId && <button
               className="workspace-mode"
               disabled={!chat.storedId || contextLoading}
@@ -295,10 +321,27 @@ export function App({
             </span>
           </span>
         </header>
+        <nav className="chat-view-tabs" role="tablist" aria-label="对话视图" onKeyDown={event => {
+          if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
+          event.preventDefault();
+          const next = event.key === 'Home' ? 'conversation' : event.key === 'End' ? 'trace' : conversationView === 'trace' ? 'conversation' : 'trace';
+          switchConversationView(next);
+          event.currentTarget.querySelector<HTMLButtonElement>(`[data-view="${next}"]`)?.focus();
+        }}>
+          <button id="chat-conversation-tab" data-view="conversation" role="tab" aria-selected={conversationView==='conversation'} aria-controls="chat-conversation-panel" tabIndex={conversationView==='conversation'?0:-1} onClick={()=>switchConversationView('conversation')}>对话</button>
+          <button id="chat-trace-tab" data-view="trace" role="tab" aria-selected={conversationView==='trace'} aria-controls="chat-trace-panel" tabIndex={conversationView==='trace'?0:-1} onClick={()=>switchConversationView('trace')}>轨迹</button>
+        </nav>
+        {conversationView==='trace' && <section id="chat-trace-panel" className="chat-trace-panel" role="tabpanel" aria-labelledby="chat-trace-tab">
+          <TraceView key={chat.storedId} steps={traceSteps} running={chat.running} loading={trace.loading || chat.workspaceConnecting || (chat.busy && !chat.items.length) || controller.connection !== 'open'} error={trace.error} onRefresh={trace.refresh} hasMore={trace.hasMore} onLoadMore={trace.loadMore}/>
+        </section>}
         {projectActive && <header className="studio-chat-heading"><span className="studio-agent-mark">✦</span><div><strong>创作对话</strong><span>Agent · {creationNodes.find(([node])=>node===creatorContext!.node)?.[1]}</span></div><button aria-label="对话记录" aria-expanded={recordView} onClick={()=>{if(!recordView){recordScroll.current=conversation.current?.scrollTop || 0;recordReturn.current=true;}setRecordView(v=>!v);}}>对话记录<Icon name="chat" size={16}/></button></header>}
         {projectActive && !recordView && <nav className="conversation-scope" aria-label="项目记录范围"><button aria-pressed={conversationScope==='task'} onClick={()=>setConversationScope('task')}>当前任务</button><button aria-pressed={conversationScope==='all'} onClick={()=>setConversationScope('all')}>全部讨论</button>{readOnly&&<button onClick={()=>{setSettingsTab('tools');setSettings(true);}}><Icon name="lock" size={14}/>只读工具</button>}</nav>}
         <div
           className="conversation"
+          id="chat-conversation-panel"
+          role="tabpanel"
+          aria-labelledby="chat-conversation-tab"
+          hidden={conversationView==='trace'}
           ref={conversation}
           onScroll={(event) => {
             if (recordView) return;
@@ -310,9 +353,9 @@ export function App({
         >
           {!projectActive && contextLoading && !visibleItems.length ? <div className="conversation-loading" role="status">正在读取对话…</div> : projectActive && recordView ? <ProjectConversationRecords project={creatorContext!.id} items={chat.items} onClose={()=>setRecordView(false)} onSelect={id=>{pendingJump.current=id;followRef.current=false;setFollowing(false);setConversationScope('all');setRecordView(false);}}/> : !visibleItems.length && projectActive ? <section className="task-welcome"><span>{creationNodes.find(n=>n[0]===creatorContext!.node)?.[1]} + Chat</span><h1>{creatorContext!.node==='cover'?'这张图，你想怎样改？':creatorContext!.node==='script'?'一起打磨口播':creatorContext!.node==='video'?'一起确定镜头与节奏':'先把创作方向说清楚'}</h1><p>{creatorContext!.node==='cover'?'说清修改目标和保留项，先看方案，再应用。':creatorContext!.node==='script'?'用项目资料起稿，再逐句讨论与修改。':creatorContext!.node==='video'?'讨论分镜、字幕和素材，准备好后再合成。':'核对商品事实、受众与风格。'}</p><button onClick={()=>{setConversationScope('all');}}>查看之前的讨论</button></section> : !visibleItems.length ? (
             <section className="welcome">
-
+              <h1>{workspaceId ? shortStudioName(linkedProject?.name) : '从这里开始创作'}</h1>
               <p className="welcome-subtitle">
-                {workspaceId ? `${linkedProject?.pictures || 0} 张素材 · ${linkedProject?.shots || 0} 个镜头${linkedProject?.adopted ? ` · 已采用 ${linkedProject.adopted} 个片段` : ""}` : ""}
+                {workspaceId ? `${linkedProject?.pictures || 0} 张素材 · ${linkedProject?.shots || 0} 个镜头${linkedProject?.adopted ? ` · 已采用 ${linkedProject.adopted} 个片段` : ""}` : "提问、处理任务，或上传素材开始创作。"}
               </p>
               <div className="suggestions">
                 {(workspaceId ? [
@@ -346,6 +389,7 @@ export function App({
                   key={item.id}
                   item={item}
                   owner={chat.storedId}
+                  canvasTarget={workspaceId && connected && !contextLoading && chat.sessionId ? {workspace:workspaceId,sessionId:chat.sessionId} : undefined}
                   onSaveIdea={!projectActive&&chat.storedId ? handoffIdea : undefined}
                   saveIdeaLabel={workspaceId?'带到项目画布':'以此方案建立项目'}
                   currentMain={mainScript?.owner===chat.storedId && mainScript.project===creatorContext?.id ? mainScript.text : undefined}
@@ -373,7 +417,7 @@ export function App({
             </div>
           )}
         </div>
-        <div className="composer-area" hidden={projectActive && recordView}>
+        <div className="composer-area" hidden={projectActive && recordView && conversationView==='conversation'}>
           {chat.error && (
             <div className="error-banner" role="alert">
               <span>⚠ {chat.error}</span>
@@ -387,12 +431,13 @@ export function App({
               )}
             </div>
           )}
-          {!following && (
+          {conversationView==='conversation' && !following && (
             <button className="jump-latest" onClick={follow}>
               ↓ 回到最新消息
             </button>
           )}
           {handoffError && <p role="alert" className="composer-error">{handoffError}<button onClick={()=>setHandoffError('')}>关闭</button></p>}
+          <ClarificationCards controller={controller}/>
           <Composer
             key={chat.storedId || "pending"}
             controller={controller}

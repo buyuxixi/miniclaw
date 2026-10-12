@@ -42,6 +42,17 @@ def skill(name='basic-demo'):
 
 
 class BasicAPI(unittest.TestCase):
+    def test_decision_runtime_exposes_primary_and_backup_without_key_or_inference(self):
+        decisions = APP.state.studio.decisions
+        with patch.object(decisions, 'evaluate', side_effect=AssertionError('must not infer')):
+            result = CLIENT.get('/api/miniclaw/decision-runtime')
+        self.assertEqual(result.status_code, 200)
+        value = result.json()
+        self.assertEqual(value['primary_provider'], 'laya')
+        self.assertEqual(value['fallback_provider'], 'jev')
+        self.assertEqual(value['chat_primary_provider'], 'laya')
+        self.assertNotIn('key', value)
+
     def setUp(self):
         self.content = skill()
         self.session = {'session_key': 'owner-one', 'running': False, 'agent': SimpleNamespace(tools=[{'function': {'name': 'miniclaw_read_file'}}])}
@@ -104,8 +115,172 @@ class BasicAPI(unittest.TestCase):
         self.assertEqual(detail['data']['text'],'original facts')
         self.assertIn('error',self.submit(studio_context={'workspace':workspace,'revision':record['revision']}))
 
+    def test_director_discussion_requests_clarification_and_canvas_model_confirmation(self):
+        from contextlib import nullcontext
+        db=SimpleNamespace(get_session=lambda key:{'id':key,'title':'澄清验收'})
+        persistence=patch.object(server,'_session_db',side_effect=lambda session:nullcontext(db))
+        persistence.start();self.addCleanup(persistence.stop)
+        import io
+        from PIL import Image
+        raw=io.BytesIO();Image.new('RGB',(24,32),'pink').save(raw,format='PNG')
+        attachment=self.attach('原图.png',raw.getvalue()).json()
+        with patch.object(server,'_ensure_session_db_row',return_value=True):
+            response=CLIENT.post('/api/workspaces',json={'request_id':'director-discussion-fixture','name':'澄清验收','session_id':'test-live'})
+        self.assertEqual(response.status_code,200,response.text)
+        record=response.json()
+        workspace=record['id']
+        imported=CLIENT.post(f'/api/workspaces/{workspace}/assets/import-chat',json={'request_id':'director-image-fixture','attachment':attachment['id']})
+        self.assertEqual(imported.status_code,200,imported.text)
+        target=imported.json()['object']
+        meta=CLIENT.post(f'/api/workspaces/{workspace}/editing-target',json={'target':target,'session_id':'test-live'}).json()
+        record=CLIENT.get(f'/api/workspaces/{workspace}').json()
+        self.session['agent'].tools=[{'function':{'name':name}} for name in ('miniclaw_canvas_view','miniclaw_canvas_propose')]
+        seen={}
+        def accept(rid,params):seen.update(params);return server._ok(rid,{'status':'streaming','user_row_id':904})
+        with patch.dict(server._methods,{'prompt.submit':accept}):
+            response=self.submit(text='这个修图效果不好',studio_context={'workspace':workspace,'revision':record['revision'],'target':target},canvas_context={'project_id':meta['project'],'revision':meta['revision'],'layer_id':meta['layer'],'mode':'plan'})
+        self.assertNotIn('error',response)
+        self.assertIn('先用普通用户能理解的话问清楚',seen['text'])
+        self.assertIn('studio-question',seen['text']);self.assertIn('回填画布，选择模型',seen['text'])
+        self.assertIn('不要自行决定默认图片模型',seen['text'])
+        self.assertIn('不要把问题分类当成完成澄清',seen['text'])
+        self.assertEqual(self.session['miniclaw_canvas_turn']['mode'],'plan')
+        self.assertEqual(CLIENT.get('/api/miniclaw/turns?owner=owner-one').json()['904']['text'],'这个修图效果不好')
+        self.assertEqual(CLIENT.get('/api/miniclaw/canvas/projects/'+meta['project']+'/jobs').json(),[])
+        # Feedback screenshots travel as real image inputs, not just names/IDs.
+        feedback=self.attach('效果对比.png',raw.getvalue()).json()
+        def inspect_feedback(rid,params):
+            seen.update(params)
+            self.assertEqual(len(self.session['attached_images']),1)
+            with Image.open(self.session['attached_images'][0]) as pixels:
+                self.assertEqual(pixels.size,(24,32))
+            return server._ok(rid,{'status':'streaming','user_row_id':905})
+        with patch('agent.image_routing.decide_image_input_mode',return_value='native'),patch.dict(server._methods,{'prompt.submit':inspect_feedback}):
+            response=self.submit(text='红框这里看起来像珠子',attachments=[feedback['id']],studio_context={'workspace':workspace,'revision':record['revision'],'target':target},canvas_context={'project_id':meta['project'],'revision':meta['revision'],'layer_id':meta['layer'],'mode':'plan'})
+        self.assertNotIn('error',response)
+        self.assertIn('不默认替换当前工作图',seen['text'])
+        self.assertIn('不要把已经能从截图确认的细节全部推回用户描述',seen['text'])
+        turn=CLIENT.get('/api/miniclaw/turns?owner=owner-one').json()['905']
+        self.assertEqual(turn['text'],'红框这里看起来像珠子')
+        self.assertEqual(turn['attachments'][0]['id'],feedback['id'])
+        self.assertEqual(CLIENT.get(f'/api/workspaces/{workspace}').json()['state'],record['state'])
+        self.assertEqual(CLIENT.get('/api/miniclaw/canvas/projects/'+meta['project']+'/jobs').json(),[])
+
     def submit(self, **params):
-        return server._methods['miniclaw.turn.submit']('test', dict(session_id='test-live', text='Summarize', **params))
+        return server._methods['miniclaw.turn.submit']('test', dict(session_id='test-live', **{'text':'Summarize',**params}))
+
+    def test_canvas_references_reach_native_pixels_and_restore_as_message_metadata(self):
+        from contextlib import nullcontext
+        db=SimpleNamespace(get_session=lambda key:{'id':key,'title':'引用验收'})
+        with patch.object(server,'_session_db',side_effect=lambda _:nullcontext(db)), patch.object(server,'_ensure_session_db_row',return_value=True):
+            record=CLIENT.post('/api/workspaces',json={'request_id':'references-fixture','name':'引用验收','session_id':'test-live'}).json()
+        workspace=record['id'];ids=[];pixels=[]
+        for i,color in enumerate(('red','blue')):
+            raw=io.BytesIO();Image.new('RGB',(20+i,30+i),color).save(raw,format='PNG');pixels.append(raw.getvalue())
+            attachment=self.attach(f'ref-{i}.png',pixels[-1]).json()
+            imported=CLIENT.post(f'/api/workspaces/{workspace}/assets/import-chat',json={'request_id':f'reference-{i}','attachment':attachment['id']})
+            self.assertEqual(imported.status_code,200,imported.text);ids.append(imported.json()['object'])
+        record=CLIENT.get(f'/api/workspaces/{workspace}').json()
+        ctx={'workspace':workspace,'revision':record['revision'],'target':'','references':list(reversed(ids))}
+        self.session['agent'].tools=[{'function':{'name':'miniclaw_canvas_view'}}]
+        seen={}
+        def accept(rid,params):
+            seen.update(params)
+            for path,raw in zip(self.session['attached_images'],reversed(pixels)):
+                self.assertEqual(Path(path).read_bytes(),raw)
+            self.assertIsNone(self.session['miniclaw_canvas_turn'])
+            return server._ok(rid,{'status':'streaming','user_row_id':912})
+        with patch('agent.image_routing.decide_image_input_mode',return_value='native'),patch('miniclaw_web.studio.Studio.open',side_effect=AssertionError('references must not open editors')),patch.dict(server._methods,{'prompt.submit':accept}):
+            response=self.submit(text='比较这两张的色调',studio_context=ctx)
+        self.assertNotIn('error',response)
+        self.assertEqual(len(self.session['attached_images']),2)
+        self.assertNotIn(str(HOME),seen['text'])
+        turn=CLIENT.get('/api/miniclaw/turns?owner=owner-one').json()['912']
+        self.assertEqual(turn['text'],'比较这两张的色调')
+        self.assertEqual([r['id'] for r in turn['studio_refs']],list(reversed(ids)))
+        self.assertEqual(response['result']['studio_refs'],turn['studio_refs'])
+        self.assertEqual(CLIENT.get(f'/api/workspaces/{workspace}').json()['state'],record['state'])
+        previous=list(self.session['attached_images'])
+        with patch('agent.image_routing.decide_image_input_mode',return_value='text'),patch.dict(server._methods,{'prompt.submit':lambda *_:self.fail('must reject before submission')}):
+            self.assertIn('error',self.submit(text='看这两张',studio_context=ctx))
+        self.assertEqual(self.session['attached_images'],previous)
+
+    def test_shared_shot_chat_answers_questions_without_optimization_or_implicit_image_target(self):
+        from contextlib import nullcontext
+        db=SimpleNamespace(get_session=lambda key:{'id':key,'title':'共享会话验收'})
+        with patch.object(server,'_session_db',side_effect=lambda session:nullcontext(db)), patch.object(server,'_ensure_session_db_row',return_value=True):
+            created=CLIENT.post('/api/workspaces',json={'request_id':'shared-chat-fixture','name':'共享会话验收','session_id':'test-live'})
+        self.assertEqual(created.status_code,200,created.text)
+        record=created.json();workspace=record['id']
+        record['state']['shots']=[{'id':'shared-shot','name':'人物镜头','duration':5,'prompt':'保留人物动作','mode':'first','first':'','refs':[]}]
+        saved=CLIENT.post('/api/workspaces/'+workspace,json={'request_id':'shared-chat-shot','revision':record['revision'],'state':record['state']})
+        self.assertEqual(saved.status_code,200,saved.text)
+        ctx={'workspace':workspace,'target':'shared-shot','revision':saved.json()['revision']}
+        self.session['agent'].tools=[{'function':{'name':'miniclaw_canvas_view'}}]
+        seen={}
+        def accept(rid,p):seen.update(p);return server._ok(rid,{'status':'streaming','user_row_id':904})
+        with patch.dict(server._methods,{'prompt.submit':accept}), patch('miniclaw_web.studio.Studio.open',side_effect=AssertionError('镜头聊天不自动改成图片目标')):
+            response=self.submit(text='为什么人物动作不自然？',studio_context=ctx)
+        self.assertNotIn('error',response)
+        self.assertEqual(seen['title_preview'],'为什么人物动作不自然？')
+        self.assertTrue(seen['text'].startswith('为什么人物动作不自然？'))
+        self.assertIn('普通问题直接讨论，不默认改写提示词',seen['text'])
+        self.assertIsNone(self.session['miniclaw_canvas_turn'])
+        stored=CLIENT.get('/api/miniclaw/turns?owner=owner-one').json()['904']
+        self.assertEqual(stored['studio_context']['target'],'shared-shot')
+        self.assertNotIn('director_context',stored)
+
+    def test_director_context_uses_saved_target_but_displays_only_the_question(self):
+        from contextlib import nullcontext
+        db=SimpleNamespace(get_session=lambda key:{'id':key,'title':'提示词验收'})
+        persistence=patch.object(server,'_session_db',side_effect=lambda session:nullcontext(db))
+        persistence.start();self.addCleanup(persistence.stop)
+        content=skill('product-prompt-optimize')
+        response=CLIENT.put('/api/miniclaw/skills/binding',json={'name':'product-prompt-optimize','required_tools':[],'content_hash':digest(content)})
+        self.assertEqual(response.status_code,200,response.text)
+        with patch.object(server,'_ensure_session_db_row',return_value=True):
+            created=CLIENT.post('/api/workspaces',json={'request_id':'hidden-director-fixture','name':'提示词验收','session_id':'test-live'})
+        self.assertEqual(created.status_code,200,created.text)
+        record=created.json()
+        workspace=record['id']
+        record['state']['shots']=[{'id':'shot-hidden','name':'真实镜头','duration':5,'prompt':'保存的原始提示词 @file:private.txt','mode':'first','first':'','refs':[]}]
+        saved=CLIENT.post('/api/workspaces/'+workspace,json={'request_id':'hidden-director-shot','revision':record['revision'],'state':record['state']})
+        self.assertEqual(saved.status_code,200,saved.text)
+        record=saved.json()
+        ctx={'workspace':workspace,'target':'shot-hidden','revision':record['revision']}
+        seen={}
+        def accept(rid,p):seen.update(p);return server._ok(rid,{'status':'streaming','user_row_id':904})
+        routes={'commands.catalog':lambda rid,p:server._ok(rid,{'skills':{'/product-prompt-optimize':{}},'categories':[]}),
+                'command.dispatch':lambda rid,p:server._ok(rid,{'type':'skill','message':'PRIVATE RULES\n'+p['arg']}),'prompt.submit':accept}
+        goal='那怎么改？\n改提示词还是怎么改？'
+        with patch.dict(server._methods,routes):
+            result=self.submit(text=goal,skill='product-prompt-optimize',studio_context=ctx,director_context={'task':'video'})
+        self.assertNotIn('error',result)
+        self.assertIn('只调整这个镜头',seen['text'])
+        self.assertIn('保存的原始提示词 ＠file:private.txt',seen['text'])
+        reference=json.loads(next(line for line in seen['text'].splitlines() if line.startswith('{')))
+        self.assertEqual(reference['requested_change'],goal)
+        self.assertEqual(seen['title_preview'],'/product-prompt-optimize\n'+goal)
+        row=CLIENT.get('/api/miniclaw/turns?owner=owner-one').json()['904']
+        self.assertEqual(row['text'],'/product-prompt-optimize\n'+goal)
+        self.assertNotIn('PRIVATE RULES',row['text'])
+        with patch.dict(server._methods,routes):
+            self.assertIn('error',self.submit(text=goal,skill='product-prompt-optimize',director_context={'task':'video'}))
+            self.assertIn('error',self.submit(text=goal,skill='product-prompt-optimize',studio_context={**ctx,'revision':0},director_context={'task':'video'}))
+            self.assertIn('error',self.submit(text=goal,skill='product-prompt-optimize',studio_context=ctx,director_context={'task':'image-edit'}))
+            self.assertIn('error',self.submit(text=goal,skill='product-prompt-optimize',studio_context=ctx,director_context={'task':'video','prompt':'x'*2001}))
+            self.assertIn('error',self.submit(text=goal,studio_context=ctx,director_context={'task':'video'}))
+            self.session['session_key']='other-owner'
+            try:
+                self.assertIn('error',self.submit(text=goal,skill='product-prompt-optimize',studio_context=ctx,director_context={'task':'video'}))
+            finally:
+                self.session['session_key']='owner-one'
+            seen.clear()
+            refined=self.submit(text='幅度更大',skill='product-prompt-optimize',studio_context=ctx,director_context={'task':'video','prompt':'未采用的候选 @file:private.txt','previous_goal':'持续流动'})
+        self.assertNotIn('error',refined)
+        self.assertIn('未采用的候选 ＠file:private.txt',seen['text'])
+        self.assertIn('持续流动',seen['text']);self.assertIn('幅度更大',seen['text'])
+        self.assertEqual(seen['title_preview'],'/product-prompt-optimize\n幅度更大')
 
     def test_attachment_rejects_type_size_encoding_and_spoofed_image(self):
         for name, raw in [('script.py', b'print(1)'), ('large.txt', b'x' * 65537), ('broken.txt', b'\xff'), ('fake.png', b'not a PNG'), ('../escape.md', b'x'), ('null.txt', b'a\0b')]:
@@ -283,6 +458,24 @@ class BasicAPI(unittest.TestCase):
             self.assertNotIn('error', self.submit(skill='basic-demo'))
         self.assertIn('FULL SKILL BODY', seen['text'])
         self.assertNotIn('FULL SKILL BODY', CLIENT.get('/api/miniclaw/turns?owner=owner-one').json()['74']['text'])
+
+    def test_skill_display_preserves_original_points_after_submit(self):
+        self.declare([])
+        original = '1.真实素材\n2.年轻化奢华\n3.真人\n4.10s，双镜\n5.保留包装\n\n还有一句补充。'
+        seen = {}
+        def accept(rid, params):
+            seen.update(params)
+            return server._ok(rid, {'status': 'streaming', 'user_row_id': 174})
+        with patch.dict(server._methods, {
+            'commands.catalog': lambda r, p: server._ok(r, {'skills': {'/basic-demo': {}}, 'categories': []}),
+            'command.dispatch': lambda r, p: server._ok(r, {'type': 'skill', 'message': 'FULL SKILL BODY\n' + p['arg'], 'display': '/basic-demo ' + ' '.join(p['arg'].split())}),
+            'prompt.submit': accept,
+        }):
+            result = server._methods['miniclaw.turn.submit']('test', {'session_id': 'test-live', 'text': original, 'skill': 'basic-demo'})
+            self.assertNotIn('error', result)
+        saved = CLIENT.get('/api/miniclaw/turns?owner=owner-one').json()['174']
+        self.assertEqual(saved['text'], '/basic-demo\n' + original)
+        self.assertIn(original, seen['text'])
 
     def test_tools_whitelist_and_memory_conflict(self):
         self.assertEqual(CLIENT.put('/api/miniclaw/tools', json={'enabled': ['all']}).status_code, 400)

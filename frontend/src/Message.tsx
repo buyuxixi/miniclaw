@@ -6,8 +6,14 @@ import { Icon } from "./Icon";
 import { AttachmentCard } from "./AttachmentCard";
 import { ArtifactDownload } from "./ArtifactDownload";
 import { ImageJobCard } from "./ImageJobCard";
+import type { ChatImageCanvasTarget } from './ChatImageCanvasAction';
 import type { Attachment } from "./attachments";
+import { skillDetails } from './skill-readiness';
 import { briefDisplay, parseBrief, spokenMain, type BriefCandidate } from './creator-candidates';
+import {clarification} from './director-conversation';
+import {DirectorQuestions} from './DirectorQuestions';
+import {StudioReferences} from './StudioReferences';
+import {documentToolLabel} from './tool-label';
 
 function pretty(value: unknown) {
   if (typeof value === "string") {
@@ -30,6 +36,9 @@ export function Message({
   onSaveIdea,
   saveIdeaLabel='放到项目画布',
   currentMain,
+  canvasTarget,
+  onAnswer,
+  answerDisabled=false,
 }: {
   item: ChatItem;
   owner: string;
@@ -40,6 +49,9 @@ export function Message({
   onSaveIdea?: (item: string) => Promise<void>;
   saveIdeaLabel?: string;
   currentMain?: string;
+  canvasTarget?: ChatImageCanvasTarget;
+  onAnswer?: (answer:string)=>Promise<boolean>;
+  answerDisabled?:boolean;
 }) {
   const [copyStatus, setCopyStatus] = useState("");
   const [savingIdea,setSavingIdea]=useState(false);
@@ -61,7 +73,8 @@ export function Message({
               <Icon name={item.name==='miniclaw_list_files'?'folder':item.name?.includes('canvas')?'image':'activity'} size={15} />
             </span>
             <span>
-              {item.name === 'miniclaw_canvas_propose' ? '制定修图方案'
+              {item.name === 'miniclaw_document_query' ? documentToolLabel(item.name,item.args,item.result)
+                : item.name === 'miniclaw_canvas_propose' ? '制定修图方案'
                 : item.name === 'miniclaw_canvas_view' ? '读取工作图'
                 : item.name === 'miniclaw_canvas_region' ? '局部修改'
                 : item.name === 'miniclaw_canvas_ai' ? '生成修图候选'
@@ -121,19 +134,38 @@ export function Message({
           ["miniclaw_edit_image", "miniclaw_image_status"].includes(
             item.name ?? "",
           ) && (
-            <ImageJobCard owner={owner} result={item.result} onEdit={onEdit} />
+            <ImageJobCard owner={owner} result={item.result} onEdit={onEdit} canvasTarget={canvasTarget} />
           )}
       </>
     );
+  const skillPrefix = item.skill ? `/${item.skill}` : '';
+  const question=item.kind==='assistant'?clarification(item.text):null;
+  const replyText=question?.body??(item.kind==='assistant'&&item.status==='running'?item.text.replace(/```studio-question[\s\S]*$/,''):item.text);
+  const userText = skillPrefix && item.text.startsWith(skillPrefix) &&
+    (item.text.length === skillPrefix.length || /\s/.test(item.text[skillPrefix.length]))
+    ? item.text.slice(skillPrefix.length).replace(/^\r?\n|^ /, '') : item.text;
+  const attachmentCards = !!item.attachments?.length && (
+    <div className={`attachments${item.kind === 'user' ? ' user-attachments' : ''}`}>
+      {item.attachments!.map(a => <AttachmentCard key={a.id} attachment={a} owner={owner} canvasTarget={canvasTarget} variant={item.kind === 'user' ? 'tile' : 'row'}
+        onEdit={onEdit && a.kind === 'image' ? () => onEdit(a) : undefined} />)}
+    </div>
+  );
   return (
     <article className={`message ${item.kind}`}>
       <div className="message-label">
         {item.kind === "assistant" ? <span className="reply-mark" aria-label="miniclaw">m</span> : "你"}
       </div>
-      <div className="message-body">
-        {item.kind === "user" ? (
-          <p>{item.text}</p>
-        ) : (
+      {item.kind === 'user' ? (
+        <div className="user-message-content">
+          {attachmentCards}
+          {!!item.studio_refs?.length&&<StudioReferences items={item.studio_refs}/>}
+          {(userText || item.skill) && <div className="message-body">
+            {item.skill && <div className="message-skill" title={`/${item.skill}`}><Icon name="skills" size={14} />{skillDetails({name:item.skill,description:''}).title}</div>}
+            {userText && <p>{userText}</p>}
+          </div>}
+        </div>
+      ) : (
+        <div className="message-body">
           <Markdown
             remarkPlugins={[remarkGfm]}
             skipHtml
@@ -142,24 +174,13 @@ export function Message({
               img: () => <span>请在附件或修图结果卡片中查看图片。</span>,
             }}
           >
-            {briefDisplay(item.text)}
+            {briefDisplay(replyText)}
           </Markdown>
-        )}
-      </div>
-      {!!item.attachments?.length && (
-        <div className="attachments">
-          {item.attachments.map((a) => (
-            <AttachmentCard
-              key={a.id}
-              attachment={a}
-              owner={owner}
-              onEdit={
-                onEdit && a.kind === "image" ? () => onEdit(a) : undefined
-              }
-            />
-          ))}
+          {question&&onAnswer&&<DirectorQuestions questions={question.questions} disabled={answerDisabled||item.status==='running'} onAnswer={onAnswer}/>}
+          {question&&!onAnswer&&question.questions.map((q,i)=><section key={i}><p><strong>{q.title}</strong></p><p>{q.options.join(' / ')}</p></section>)}
         </div>
       )}
+      {item.kind !== 'user' && attachmentCards}
       {item.status === "running" && !item.text && (
         <span className="thinking">正在思考…</span>
       )}

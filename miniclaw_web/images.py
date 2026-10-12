@@ -144,6 +144,9 @@ class ImageJobs:
                 if existing['request_hash'] != request_hash:
                     raise ValueError('同一请求标识不能用于不同修图参数')
                 return self.public(existing)
+            clarification_service = getattr(self, 'clarifications', None)
+            if clarification_service:
+                clarification_service.guard_manual(owner=owner)
             active = [j for j in self.store.image_jobs() if j['state'] in ACTIVE]
             if any(j['owner'] == owner for j in active):
                 raise ValueError('本对话已有修图任务，请等待完成或取消')

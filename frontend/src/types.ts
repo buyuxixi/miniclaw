@@ -1,11 +1,12 @@
 import type { Attachment } from './attachments';
+import type {StudioReference} from './StudioReferences';
 import type { CreatorTurn } from './creator-api';
 export interface HistoryRow {
   role: string;
   text?: string | null;
   content?: unknown;
   name?: string;
-  args?: Record<string, unknown>;
+  args?: Record<string, unknown> | string;
   tool_call_id?: string;
   row_id?: number;
   id?: number;
@@ -21,6 +22,8 @@ export interface ChatItem {
   result?: unknown;
   status?: 'running' | 'done' | 'error' | 'interrupted' | 'unavailable';
   attachments?: Attachment[];
+  studio_refs?: StudioReference[];
+  skill?: string;
   creator_context?: CreatorTurn;
 }
 
@@ -51,10 +54,11 @@ export interface SessionSnapshot {
   messages: HistoryRow[];
   info: SessionInfo;
   running?: boolean;
-  inflight?: { user?: string; assistant?: string; streaming?: boolean; error?: string };
+  inflight?: { user?: string; assistant?: string; streaming?: boolean; error?: string; error_surface?: {code?: string} };
 }
 
 export interface ChatState {
+  clarifications?: ClarificationRequest[];
   sessions: SessionRow[];
   sessionId: string;
   storedId: string;
@@ -66,4 +70,16 @@ export interface ChatState {
   openingId?: string;
   status: string;
   error: string;
+}
+
+export interface ClarificationRequest {
+  id: string;
+  task_id: string;
+  status: 'pending' | 'answered' | 'timed_out' | 'canceled' | 'superseded' | 'blocked';
+  version: number;
+  deadline: number;
+  task_status?: string;
+  reason?: string;
+  questions: {id: string; question: string; choices: string[]; multi_select: boolean}[];
+  answers?: Record<string, string | string[]>;
 }

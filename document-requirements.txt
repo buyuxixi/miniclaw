@@ -1,0 +1,4 @@
+# Local attachment parsers, installed in the project environment only.
+pypdf==6.20.0
+python-docx==1.2.0
+openpyxl==3.1.5

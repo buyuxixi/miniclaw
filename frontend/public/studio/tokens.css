@@ -1,0 +1,39 @@
+/* Shared by Chat, project navigation and the canvas.
+   "Light table" direction: the editor's viewing table. Warm paper chrome recedes, the media is the subject.
+   Ink is warm, never pure black; one persimmon accent (tungsten light) marks the primary action,
+   selection, adopted and generating states. Surfaces step by temperature. See docs/redesign-log.md. */
+:root {
+  color-scheme: light;
+  --ui-background: #f3f1ec;
+  --ui-surface: #fbfaf7;
+  --ui-raised: #ece9e2;
+  --ui-text: #2b2925;
+  --ui-secondary: #77726a;
+  --ui-faint: #a29c92;
+  --ui-border: #e4e0d7;
+  --ui-border-strong: #d3cec3;
+  --ui-accent: #c4572e;
+  --ui-accent-hover: #ad4a25;
+  --ui-accent-soft: #f7e6dc;
+  --ui-accent-ink: #fff8f3;
+  --ui-hover: #2b29250a;
+  --ui-pressed: #2b292514;
+  --ui-stage: #e7e4dd;
+  --ui-stage-dot: #2b29251a;
+  --ui-connection: #80786d;
+  --ui-assistant-width: 440px;
+  --ui-success: #4f7a55;
+  --ui-danger: #b0412f;
+  --ui-shadow-sm: 0 1px 2px #3a32261a;
+  --ui-shadow: 0 1px 2px #3a322614, 0 10px 28px #3a32261f;
+  --ui-shadow-media: 0 2px 4px #3a32261f, 0 14px 34px #3a322629;
+  --ui-radius: 10px;
+  --ui-radius-sm: 6px;
+  --ui-fast: 140ms;
+  --ui-enter: 200ms;
+  --ui-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --font-sans:
+    "HarmonyOS Sans SC", "MiSans", "PingFang SC", "Microsoft YaHei", "Segoe UI",
+    system-ui, sans-serif;
+  --font-num: "Segoe UI", "SF Pro Text", system-ui, sans-serif;
+}

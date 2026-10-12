@@ -60,6 +60,8 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Storyboard tests failed' }
         & $pythonPath (Join-Path $projectRoot 'tests\test_narrated.py')
         if ($LASTEXITCODE -ne 0) { throw 'Narrated storyboard checks failed' }
+        & $pythonPath (Join-Path $projectRoot 'tests\test_archive_library.py')
+        if ($LASTEXITCODE -ne 0) { throw 'Archive/library tests failed' }
         Set-Location (Join-Path $projectRoot 'frontend')
         & $runtimeConfig.node $runtimeConfig.npm_cli test
     } else {

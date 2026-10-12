@@ -91,10 +91,10 @@ test('pending tool result polls its owned job and publishes a completed comparis
 });
 
 test('putting an image into a full chat draft preserves all existing attachments and text', async () => {
-  const attachments = [1, 2, 3, 4].map(i => ({ ...source, id: 'prior-' + i }));
+  const attachments = Array.from({length:10},(_,i)=>({ ...source, id: 'prior-' + i }));
   localStorage.setItem('miniclaw.draft.owner-a', JSON.stringify({ text: '不要丢失', attachments }));
   await act(async () => root.render(<Composer controller={controller} chat={state} onManage={() => {}} suggestion={{ text: '', attachment: output, nonce: 1 }} />));
-  expect(host.textContent).toContain('输入框已有4个附件');
+  expect(host.textContent).toContain('输入框已有10个附件');
   expect(JSON.parse(localStorage.getItem('miniclaw.draft.owner-a')!).attachments).toEqual(attachments);
   expect(host.querySelector<HTMLTextAreaElement>('#message-input')?.value).toBe('不要丢失');
 });

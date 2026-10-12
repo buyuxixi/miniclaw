@@ -98,6 +98,8 @@ def register(ctx):
             'required': ['name', 'content'], 'additionalProperties': False,
         }}, handler=lambda args, **kwargs: _save_artifact(ctx, args))
     register_images(ctx)
+    from miniclaw_web.document_tools import register as register_documents
+    register_documents(ctx)
     register_canvas(ctx)
     register_overlay(ctx)
 

@@ -63,12 +63,25 @@ function ImageNode({
   const image = useLoadedImage(url);
   return <KImage {...props} image={image} />;
 }
+function selectionChannels(color = "#517dff"): [number, number, number] {
+  const hex = color.match(/^#([\da-f]{3,4}|[\da-f]{6}|[\da-f]{8})$/i)?.[1];
+  if (hex) {
+    const expanded = hex.length < 5 ? [...hex.slice(0, 3)].map(c => c + c).join("") : hex.slice(0, 6);
+    return [0, 2, 4].map(i => parseInt(expanded.slice(i, i + 2), 16)) as [number, number, number];
+  }
+  const rgb = color.match(/^rgba?\(([^)]+)\)$/i)?.[1].trim().split(/[\s,\/]+/).slice(0, 3);
+  if (rgb?.length === 3 && rgb.every(c => /^[+-]?(?:\d+\.?\d*|\.\d+)%?$/.test(c)))
+    return rgb.map(c => Math.round(Math.min(255, Math.max(0, parseFloat(c) * (c.endsWith("%") ? 2.55 : 1))))) as [number, number, number];
+  return [81, 125, 255];
+}
 function SelectionNode({
   selection,
   layer,
+  color,
 }: {
   selection: Selection;
   layer: CanvasLayer;
+  color?: string;
 }) {
   const [url, setUrl] = useState("");
   useEffect(() => {
@@ -81,11 +94,12 @@ function SelectionNode({
       const context = canvas.getContext("2d")!;
       context.drawImage(image, 0, 0);
       const data = context.getImageData(0, 0, image.width, image.height);
+      const [red, green, blue] = selectionChannels(color);
       for (let i = 0; i < data.data.length; i += 4) {
         const alpha = data.data[i];
-        data.data[i] = 81;
-        data.data[i + 1] = 125;
-        data.data[i + 2] = 255;
+        data.data[i] = red;
+        data.data[i + 1] = green;
+        data.data[i + 2] = blue;
         data.data[i + 3] = Math.round(alpha * 0.38);
       }
       context.putImageData(data, 0, 0);
@@ -95,7 +109,7 @@ function SelectionNode({
     return () => {
       alive = false;
     };
-  }, [selection.mask]);
+  }, [selection.mask, color]);
   const image = useLoadedImage(url);
   return (
     <KImage
@@ -127,6 +141,7 @@ export function CanvasStage({
   onPath,
   onCrop,
   size,
+  selectionColor,
 }: {
   project: string;
   document: CanvasDocument;
@@ -142,6 +157,7 @@ export function CanvasStage({
   onPath: (points: number[][]) => void;
   onCrop: (points: number[][]) => void;
   size: { width: number; height: number };
+  selectionColor?: string;
 }) {
   const stage = useRef<Konva.Stage>(null);
   const transformer = useRef<Konva.Transformer>(null);
@@ -149,6 +165,9 @@ export function CanvasStage({
   const pathRef = useRef<number[][]>([]);
   const drawing = useRef(false);
   const target = doc.layers.find((l) => l.id === selected);
+  const selectionRgb = selectionChannels(selectionColor);
+  const selectionStroke = selectionColor ? `rgb(${selectionRgb.join(",")})` : "#517dff";
+  const selectionFill = selectionColor ? `rgba(${selectionRgb.join(",")},${48 / 255})` : "#517dff30";
   useEffect(() => {
     const node = stage.current?.findOne(`#layer-${selected}`);
     transformer.current?.nodes(
@@ -330,11 +349,14 @@ export function CanvasStage({
                 );
               })}
             {selection && target?.id === selection.layer_id && (
-              <SelectionNode selection={selection} layer={target} />
+              <SelectionNode selection={selection} layer={target} color={selectionColor} />
             )}
           </Group>
           <Transformer
             ref={transformer}
+            borderStroke={selectionColor ? selectionStroke : undefined}
+            anchorStroke={selectionColor ? selectionStroke : undefined}
+            anchorFill={selectionColor ? selectionStroke : undefined}
             flipEnabled={false}
             rotateEnabled={!busy}
             enabledAnchors={busy ? [] : undefined}
@@ -345,8 +367,8 @@ export function CanvasStage({
           {corners && (tool === "rectangle" || tool === "crop") ? (
             <Rect
               {...corners}
-              fill="#517dff30"
-              stroke="#517dff"
+              fill={selectionFill}
+              stroke={selectionStroke}
               strokeWidth={1 / view.scale}
               dash={[5 / view.scale, 3 / view.scale]}
               listening={false}
@@ -355,10 +377,10 @@ export function CanvasStage({
             path.length > 0 && (
               <Line
                 points={points}
-                stroke="#517dff"
+                stroke={selectionStroke}
                 strokeWidth={3 / view.scale}
                 closed={tool === "lasso"}
-                fill={tool === "lasso" ? "#517dff30" : undefined}
+                fill={tool === "lasso" ? selectionFill : undefined}
                 listening={false}
               />
             )

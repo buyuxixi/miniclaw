@@ -1,0 +1,44 @@
+.clarification-panel {
+  color:var(--ink); background:var(--ui-surface); border:1px solid var(--line);
+  border-radius:15px; padding:18px; box-shadow:0 1px 2px #4a45380a;
+  max-height:min(440px,60dvh); overflow:auto; animation:clarification-enter 160ms ease-out;
+}
+.clarification-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:14px; }
+.clarification-heading h2 { margin:0; font-size:15px; line-height:1.6; font-weight:600; overflow-wrap:anywhere; }
+.clarification-multiple { font-size:12px; color:var(--secondary); }
+.clarification-heading nav { display:flex; align-items:center; gap:4px; flex-shrink:0; color:var(--secondary); font-size:12px; font-variant-numeric:tabular-nums; }
+.clarification-panel button,.clarification-notice button { border:0; color:inherit; background:transparent; font:inherit; }
+.clarification-heading nav button { display:grid; place-items:center; width:26px; height:26px; padding:0; border-radius:5px; }
+.clarification-heading nav button:hover:not(:disabled) { background:var(--ui-hover); }
+.clarification-options { display:grid; gap:5px; border:0; padding:0; margin:0; min-width:0; }
+.clarification-option { position:relative; display:flex; align-items:center; gap:10px; padding:10px 12px; min-height:42px; border:1px solid transparent; border-radius:8px; font-size:14px; line-height:1.5; cursor:pointer; transition:background 140ms,border-color 140ms; }
+.clarification-option:hover { background:var(--ui-hover); }
+.clarification-option.is-selected { background:var(--ui-raised); border-color:var(--ui-border-strong); }
+.clarification-option input { position:absolute; width:1px; height:1px; opacity:0; }
+.clarification-option:has(input:focus-visible) { outline:2px solid var(--accent); outline-offset:2px; }
+.clarification-option:has(input:disabled) { cursor:default; opacity:.65; }
+.clarification-index { display:grid; place-items:center; width:22px; height:22px; flex-shrink:0; font-size:12px; color:var(--secondary); border:1px solid var(--line); border-radius:5px; }
+.clarification-option>span:nth-of-type(2) { flex:1; overflow-wrap:anywhere; }
+.clarification-option>svg { flex-shrink:0; opacity:0; }
+.clarification-option.is-selected>svg { opacity:1; }
+.clarification-options textarea { width:100%; min-height:74px; max-height:160px; resize:vertical; margin-top:3px; border:1px solid var(--line); border-radius:8px; padding:10px 12px; background:var(--ui-background); color:var(--ink); font-size:14px; line-height:1.6; }
+.clarification-options textarea::placeholder { color:var(--secondary); }
+.clarification-footer { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:14px; padding-top:12px; border-top:1px solid var(--line); }
+.clarification-footer>div { display:flex; gap:12px; }
+.clarification-footer>div button { color:var(--secondary); font-size:12px; padding:5px 0; }
+.clarification-footer>div button:hover:not(:disabled) { color:var(--ink); }
+.clarification-footer .clarification-submit { display:flex; align-items:center; justify-content:center; gap:8px; min-height:34px; padding:7px 12px; border-radius:7px; font-size:13px; background:var(--ink); color:var(--ui-surface); transition:opacity 140ms,transform 140ms; }
+.clarification-submit:active:not(:disabled) { transform:translateY(1px); }
+.clarification-error { color:var(--accent); margin:10px 0 0; font-size:13px; line-height:1.6; }
+.clarification-notice { padding:10px 0; font-size:13px; line-height:1.6; }
+.clarification-notice>div:first-child { display:flex; align-items:flex-start; gap:8px; color:var(--secondary); }
+.clarification-notice svg { margin-top:3px; flex-shrink:0; }
+.clarification-notice p { margin:0; overflow-wrap:anywhere; }
+.clarification-recovery-actions { display:flex; gap:16px; margin:8px 0 0 24px; }
+.clarification-notice button { padding:4px 0; }
+.clarification-resuming { display:flex; align-items:center; gap:8px; margin:0 0 8px; font-size:12px; color:var(--secondary); }
+.studio-director>.clarification-panel,.studio-director>.clarification-notice { margin:8px 12px 12px; flex-shrink:0; }
+.studio-director>form[hidden] { display:none; }
+@keyframes clarification-enter { from {opacity:0;transform:translateY(4px);} to {opacity:1;transform:translateY(0);} }
+@media(max-width:480px) { .clarification-panel { padding:14px; } .clarification-options textarea { font-size:16px; } }
+@media(prefers-reduced-motion:reduce) { .clarification-panel { animation:none; } .clarification-option,.clarification-submit { transition:none; } }

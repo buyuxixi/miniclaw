@@ -25,7 +25,8 @@ test('compiled overlay uses the authenticated artifact download rather than a mo
 test('SRT upload enforces the text size cap before issuing a request', async () => {
   const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
   try {
-    await expect(uploadFile('owner', new File(['x'.repeat(65537)], 'oversize.srt'))).rejects.toThrow('64 KiB');
+    const file=new File(['x'], 'oversize.srt');Object.defineProperty(file,'size',{value:50*1024*1024+1});
+    await expect(uploadFile('owner', file)).rejects.toThrow('50 MiB');
     expect(fetcher).not.toHaveBeenCalled();
   } finally { vi.unstubAllGlobals(); }
 });

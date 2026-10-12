@@ -9,8 +9,11 @@
   "npm": "10.9.3",
   "python_dependency_install": "uv sync --frozen --extra web --extra dev --no-default-groups",
   "node_dependency_install": "Run npm ci in frontend; optional upstream Dashboard requires its separate workspace install",
-  "source_status": "Official Git submodule pinned to the recorded commit; production core unchanged",
+  "source_status": "Official Git submodule pinned to the recorded commit; opt-in hosted turn adapters supplied as project patches",
   "local_upstream_changes": [
+    "patches/hermes-chat-clarification-v1.patch; setup applies hosted clarification adapter",
+    "patches/hermes-chat-recovery-v2.patch; setup applies bounded recovery callbacks",
+    "patches/hermes-chat-trace-v3.patch; setup applies public trace events",
     "Optional patches/windows-conpty-test-width.patch; not automatically applied"
   ]
 }

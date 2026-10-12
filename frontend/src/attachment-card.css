@@ -1,0 +1,224 @@
+/* Shared compact cards for draft and sent user attachments. */
+.composer .composer-attachments {
+  gap: 10px;
+  max-height: 272px;
+  padding: 5px 2px 12px;
+  scrollbar-width: thin;
+}
+.attachment-card.attachment-card-tile {
+  position: relative;
+  display: block;
+  flex: 0 0 clamp(128px, calc((100% - 30px) / 4), 160px);
+  width: 160px;
+  height: 122px;
+  max-width: 160px;
+  padding: 0;
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+  overflow: visible;
+}
+.message.user .user-attachments { justify-content: flex-end; gap: 10px; }
+.message.user .user-attachments .attachment-card-tile { flex: 0 0 160px; }
+.attachment-card-tile:has(.attachment-tile-actions) { height: auto; }
+.attachment-card-tile:has(.attachment-tile-actions) .attachment-tile-open { height: 122px; }
+.attachment-card-tile .attachment-tile-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 8px;
+  border-top: 1px solid var(--ui-border);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.attachment-tile-actions .secondary-action,
+.attachment-tile-actions .icon-button { min-height: 28px; padding: 4px 6px; border-radius: 5px; font-size: 11px; }
+.attachment-tile-actions .attachment-tile-edit.icon-button { width: auto; height: auto; gap: 4px; }
+.attachment-tile-open {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  overflow: hidden;
+  transition: background var(--ui-fast), box-shadow var(--ui-fast), transform var(--ui-fast);
+}
+.attachment-tile-open:hover { box-shadow: inset 0 0 0 1px var(--ui-border-strong); }
+.attachment-tile-open:active { transform: scale(.985); }
+.attachment-tile-preview {
+  position: relative;
+  display: flex;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding-bottom: 22px;
+  background: var(--ui-stage);
+  color: var(--ui-secondary);
+}
+.attachment-tile-preview > svg { flex: none; }
+.attachment-card-tile .attachment-tile-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+  border-radius: 0;
+  object-fit: cover;
+}
+.attachment-tile-type { font-size: 10px; line-height: 12px; letter-spacing: .6px; font-weight: 600; }
+.attachment-card-tile .attachment-tile-name {
+  display: block;
+  flex: none;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  padding: 9px 10px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.attachment-card-tile .attachment-tile-remove.icon-button {
+  position: absolute;
+  z-index: 1;
+  top: 3px;
+  right: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 5px;
+  border: 2px solid var(--ui-surface);
+  border-radius: 50%;
+  color: var(--ui-surface);
+  background: var(--ui-text);
+  transition: background var(--ui-fast), transform var(--ui-fast);
+}
+.attachment-tile-remove:hover { background: var(--ui-secondary) !important; }
+.attachment-tile-remove:active { transform: scale(.93); }
+.attachment-tile-status {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 12px);
+  padding: 3px 5px;
+  border-radius: 4px;
+  background: var(--ui-surface);
+  color: var(--ui-secondary);
+  font-size: 11px;
+  line-height: 13px;
+}
+.attachment-tile-status.is-partial { background: var(--ui-accent-soft); color: var(--ui-accent-hover); }
+.attachment-tile-status.is-error,
+.attachment-tile-status.is-failed { color: var(--ui-danger); }
+.attachment-tile-status.is-queued::before,
+.attachment-tile-status.is-parsing::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--ui-border-strong);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: attachment-spin 900ms linear infinite;
+}
+@keyframes attachment-spin { to { transform: rotate(360deg); } }
+.attachment-details {
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  padding: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  box-shadow: var(--ui-shadow);
+  overflow: hidden;
+  font-family: inherit;
+  animation: attachment-details-appear var(--ui-enter) var(--ui-ease);
+}
+.attachment-details::backdrop { background: #2b292533; }
+.attachment-details[open] { display: flex; flex-direction: column; }
+.attachment-details-header {
+  display: flex;
+  align-items: flex-start;
+  flex: none;
+  gap: 14px;
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid var(--ui-border);
+}
+.attachment-details-header h2 { flex: 1; margin: 0; min-width: 0; overflow-wrap: anywhere; font-size: 14px; line-height: 1.7; font-weight: 550; }
+.attachment-details-close.icon-button { flex: none; width: 32px; height: 32px; padding: 5px; border: 0; border-radius: 7px; background: transparent; color: var(--ui-secondary); }
+.attachment-details-close:hover { background: var(--ui-hover); }
+.attachment-details-body { display: flex; flex: 1; min-height: 0; overflow: auto; flex-direction: column; gap: 14px; padding: 16px 18px 18px; }
+.attachment-details-meta { display: flex; gap: 18px; flex-wrap: wrap; margin: 0; color: var(--ui-secondary); font-size: 12px; line-height: 1.7; }
+.attachment-details-meta dt { margin-bottom: 4px; }
+.attachment-details-meta dd { margin: 0; color: var(--ui-text); }
+.attachment-details-coverage { margin: 0; color: var(--ui-text); font-size: 13px; line-height: 1.7; }
+.attachment-details .attachment-error { color: var(--ui-danger); font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.attachment-details-warnings { color: var(--ui-secondary); font-size: 12px; line-height: 1.8; }
+.attachment-details-warnings h3 { margin: 0 0 8px; color: var(--ui-accent-hover); font-size: 12px; font-weight: 500; }
+.attachment-details-warnings p { margin: 10px 0; overflow-wrap: anywhere; }
+.attachment-details-actions { display: flex; flex: none; align-items: center; gap: 10px; flex-wrap: wrap; padding: 14px 18px 18px; border-top: 1px solid var(--ui-border); }
+.attachment-details-actions .attachment-text-action,
+.attachment-details-actions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: auto;
+  min-height: 36px;
+  padding: 7px 12px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ui-text);
+  font-size: 12px;
+  text-decoration: none;
+  transition: background var(--ui-fast);
+}
+.attachment-details-actions button:hover:not(:disabled),
+.attachment-details-actions a:hover { background: var(--ui-hover); }
+.attachment-details :focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 3px; }
+@keyframes attachment-details-appear {
+  from { opacity: 0; transform: translateY(6px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.composer .attachment-upload-list { padding: 0 2px 8px; gap: 6px; scrollbar-width: thin; }
+.composer .attachment-upload-row { padding: 8px 10px; border: 1px solid var(--ui-border); border-radius: 8px; background: var(--ui-surface); }
+.composer .attachment-upload-row strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+.composer .attachment-upload-actions button { border-radius: 5px; }
+.composer .attachment-upload-actions button:hover:not(:disabled) { background: var(--ui-hover); }
+@media (max-width: 480px) {
+  .attachment-card.attachment-card-tile { flex-basis: 128px; width: 128px; max-width: 128px; }
+  .message.user .user-attachments .attachment-card-tile { flex-basis: 128px; }
+  .attachment-tile-actions .secondary-action,
+  .attachment-tile-actions .icon-button { min-height: 44px; }
+  .attachment-card-tile .attachment-tile-remove.icon-button { width: 32px; height: 32px; min-height: 32px; }
+  .attachment-details { max-height: calc(100dvh - 32px); }
+  .attachment-details-actions .attachment-text-action,
+  .attachment-details-actions a,
+  .attachment-details-close.icon-button { min-height: 44px; }
+  .attachment-details-close.icon-button { width: 44px; height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .attachment-tile-open,
+  .attachment-tile-remove,
+  .attachment-details,
+  .attachment-details-actions button { animation: none; transition: none; }
+  .attachment-tile-status::before { animation: none; }
+}

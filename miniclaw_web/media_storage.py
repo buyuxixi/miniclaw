@@ -157,7 +157,7 @@ def migrate_schema(db):
     baseline=Path(__file__).with_name('schema')/'000_business_legacy.sql'
     db.executescript(baseline.read_text(encoding='utf-8'))
     db.execute('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, checksum TEXT NOT NULL, applied_at REAL NOT NULL)')
-    for version, name in ((1,'001_media_storage.sql'),(2,'002_integrity_catalog.sql')):
+    for version, name in ((1,'001_media_storage.sql'),(2,'002_integrity_catalog.sql'),(3,'003_archive_library.sql'),(4,'004_chat_clarifications.sql'),(5,'005_attachment_documents.sql')):
         source=(baseline.parent/name).read_text(encoding='utf-8')
         checksum=hashlib.sha256(source.encode()).hexdigest()
         existing=db.execute('SELECT checksum FROM schema_migrations WHERE version=?',(version,)).fetchone()
@@ -165,11 +165,11 @@ def migrate_schema(db):
             if existing[0]!=checksum:raise ValueError('已执行的数据库迁移文件发生变化')
             continue
         db.commit()
-        if version==2:
+        if version>=2:
             # SQLite backups include committed WAL pages. Never copy a live .db file.
             location=db.execute('PRAGMA database_list').fetchone()[2]
             if location and any(db.execute('SELECT 1 FROM '+table+' LIMIT 1').fetchone() for table in ('video_workspaces','canvas_projects','attachments','media_revisions')):
-                destination=Path(location).parent/'backups'/('schema-v2-'+str(time.time_ns())+'.sqlite3')
+                destination=Path(location).parent/'backups'/('schema-v'+str(version)+'-'+str(time.time_ns())+'.sqlite3')
                 destination.parent.mkdir(parents=True,exist_ok=True)
                 with closing(sqlite3.connect(destination)) as backup:db.backup(backup)
         db.execute('PRAGMA foreign_keys=OFF')

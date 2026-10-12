@@ -25,7 +25,7 @@ def planning_guard(tool_name='', session_id='', **kwargs):
     try:session = _turn_session(server._sessions,session_id)
     except ValueError:return {'action':'block','message':'同一项目有多个正在执行的对话，无法确定当前画布引用'}
     if session and (session.get('miniclaw_canvas_turn') or {}).get('mode') == 'plan':
-        if tool_name not in {'miniclaw_canvas_view', 'miniclaw_canvas_propose', 'miniclaw_canvas_job', 'skill_view', 'skills_list', 'tool_search', 'tool_describe'}:
+        if tool_name not in {'clarify', 'miniclaw_canvas_view', 'miniclaw_canvas_propose', 'miniclaw_canvas_job', 'skill_view', 'skills_list', 'tool_search', 'tool_describe'}:
             return {'action':'block','message':'本轮只整理修图方案，不能通过其他工具执行或读写无关文件。请使用画布读取与提案工具，用户随后在工作台预览或生成。'}
     return None
 

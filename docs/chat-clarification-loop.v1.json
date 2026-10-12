@@ -1,0 +1,20 @@
+{
+ "version":"clarification-loop-v1",
+ "provenance":"Author-labelled synthetic development dialogues; not production or blind; scripted user replies are supplied only after the actual question",
+ "cases":[
+  {"id":"target_edit","text":"把背景改成浅灰色。","context":{"selected":null},"reply":"第二张陶瓷杯宣传候选图","gold":{"first_questions":["target"],"steps":["edit_image"],"targets":["img2"]}},
+  {"id":"target_adopt","text":"用这个作为最终版本。","context":{"selected":null},"reply":"第二张陶瓷杯宣传候选图","gold":{"first_questions":["target"],"steps":["adopt_candidate"],"targets":["img2"]}},
+  {"id":"unknown_yes","text":"可以，开始吧。","reply":"先优化产品口播，不生成视频。","gold":{"first_questions":["intent"],"steps":["optimize_narration"],"targets":[]}},
+  {"id":"vague_action","text":"这个处理一下。","reply":"把这张图旋转90度。","gold":{"first_questions":["intent"],"steps":["edit_image"],"targets":["img1"]}},
+  {"id":"missing_region","text":"把这张图这里的杂物去掉，其他地方不动。","reply":"左下角。","gold":{"first_questions":["region"],"steps":["edit_image"],"targets":["img1"]}},
+  {"id":"no_pending","text":"你看着办吧。","reply":"先讨论一下产品宣传方向，不修改图片。","gold":{"first_questions":["intent"],"steps":["analyze_plan"],"targets":[]}},
+  {"id":"selected_rotate","text":"把这张图旋转90度。","gold":{"first_questions":[],"steps":["edit_image"],"targets":["img1"]}},
+  {"id":"explicit_second","text":"把第二张图旋转90度，第一张别动。","context":{"selected":null},"gold":{"first_questions":[],"steps":["edit_image"],"targets":["img2"]}},
+  {"id":"discussion","text":"这两张图的宣传方向哪个合适？只讨论，不动图片。","context":{"selected":null},"gold":{"first_questions":[],"steps":["analyze_plan"],"targets":[]}},
+  {"id":"compound","text":"先优化视频提示词，再生成一段陶瓷杯宣传视频。","gold":{"first_questions":[],"steps":["optimize_video_prompt","generate_video"],"targets":[]}},
+  {"id":"review_question","text":"这张图能不能还需要修吗？我们讨论一下","gold":{"first_questions":[],"steps":["analyze_plan"],"targets":[]}},
+  {"id":"quoted_action","text":"客户说把第一张背景改白，我想听你分析他具体想表达什么。","gold":{"first_questions":[],"steps":["analyze_plan"],"targets":[]}},
+  {"id":"unresolved_reply","text":"用这个作为最终版本。","context":{"selected":null},"reply":"暂时还没决定选哪张。","gold":{"first_questions":["target"],"steps":[],"targets":[],"terminal":"awaiting_input"}},
+  {"id":"draft_reply","text":"可以开始了。","reply":"只给我一版文字宣传方案，不要制作图片。","gold":{"first_questions":["intent"],"steps":["write_plan"],"targets":[]}}
+ ]
+}

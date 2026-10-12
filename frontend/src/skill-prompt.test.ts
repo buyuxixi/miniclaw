@@ -23,6 +23,7 @@ test('submits the skill identity to server loading while showing only the invoca
   expect(await controller.send('user task', 'lesson')).toBe(true);
   expect(request).toHaveBeenLastCalledWith('miniclaw.turn.submit', { session_id: 'live', text: 'user task', skill: 'lesson', attachments: [] });
   expect(controller.state.items[0].text).toBe('/lesson\nuser task');
+  expect(controller.state.items[0].skill).toBe('lesson');
 });
 
 test('revoked skill fails before dispatch or model submission and keeps the transcript', async () => {

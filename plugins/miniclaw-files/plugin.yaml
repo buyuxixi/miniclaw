@@ -3,6 +3,8 @@ version: 0.4.0
 description: Bounded text readers and optional exclusive text artifact creation for miniclaw.
 provides_tools:
   - miniclaw_read_file
+  - miniclaw_document_query
+  - miniclaw_document_analyze
   - miniclaw_list_files
   - miniclaw_save_artifact
   - miniclaw_image_list

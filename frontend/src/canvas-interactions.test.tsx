@@ -9,7 +9,8 @@ import { exportBlob, previewBlob, uploadCanvas, loadProject, type Project } from
 
 vi.mock("./management-api", () => ({ readApi: vi.fn(), writeApi: vi.fn() }));
 vi.mock("./CanvasStage", () => ({
-  CanvasStage: () => <div>canvas fixture</div>,
+  CanvasStage: ({ view, size, selectionColor }: { view: { x: number; y: number; scale: number }; size: { width: number; height: number }; selectionColor?: string }) =>
+    <div data-stage-view={JSON.stringify(view)} data-stage-size={JSON.stringify(size)} data-selection-color={selectionColor}>canvas fixture</div>,
 }));
 vi.mock("./canvas-api", async () => ({
   ...(await vi.importActual("./canvas-api")),
@@ -163,6 +164,28 @@ test('precision is explicit and returning to simple editing resets a hidden crop
   await act(async()=>byText('返回简洁编辑').click());
   expect(host.querySelector('.canvas-tools')?.hasAttribute('hidden')).toBe(true);
   expect(host.querySelector('.canvas-surface')?.className).toContain('tool-move');
+  expect(writeApi).not.toHaveBeenCalled();
+});
+
+test('video-hosted fit leaves toolbar space and themes selection without changing the media document', async () => {
+  const portrait = { ...project, document: { ...project.document, width: 400, height: 1200 } };
+  vi.mocked(loadProject).mockResolvedValue({ project: portrait, assets: [], selection: null, history: [], jobs: [], versions: [], versionTotal: 0 });
+  vi.stubGlobal('getComputedStyle', (element: Element) => {
+    expect(element.classList.contains('canvas-surface')).toBe(true);
+    return { getPropertyValue: (key: string) => key === '--ca-blue' ? 'rgb(196, 87, 46)' : '' };
+  });
+  await act(async () => root.render(render(true)));
+  const stage = () => host.querySelector<HTMLElement>('[data-stage-view]')!;
+  const fittedBottom = () => { const view = JSON.parse(stage().dataset.stageView!); return view.y + portrait.document.height * view.scale; };
+  const toolbarTop = JSON.parse(stage().dataset.stageSize!).height - 56;
+  expect(fittedBottom()).toBeGreaterThan(toolbarTop); // Preserve the standalone editor's existing fit.
+  expect(stage().dataset.selectionColor).toBeUndefined();
+  const originalDocument = JSON.stringify(portrait.document);
+  await act(async () => root.render(<CanvasApp controller={controller} active onChat={() => {}} onUse={() => {}} onSettings={() => {}}
+    workspaceHost={{ project: 'fixture', onClose() {}, onReview: async () => {} }} />));
+  expect(fittedBottom()).toBeLessThan(toolbarTop);
+  expect(stage().dataset.selectionColor).toBe('rgb(196, 87, 46)');
+  expect(JSON.stringify(portrait.document)).toBe(originalDocument);
   expect(writeApi).not.toHaveBeenCalled();
 });
 

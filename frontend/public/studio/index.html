@@ -1,158 +1,2478 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>miniclaw · 视频创作</title><link rel="icon" href="data:,"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="node-composer.css"><link rel="stylesheet" href="workbench.css"><script>window.WORKSPACE_TOKEN="__WORKSPACE_TOKEN__";window.__HERMES_SESSION_TOKEN__=window.WORKSPACE_TOKEN;</script><script src="project-name.js"></script><script src="usability.js"></script><script src="workflow.js"></script><script src="app.js"></script><script src="integration.js"></script><script src="production.js"></script><script src="node-composer.js"></script><script src="interaction.js"></script><script defer src="vendor/alpine.min.js"></script></head>
-<body><svg class="icon-definitions" aria-hidden="true"><symbol id="ui-close" viewBox="0 0 24 24"><path d="M6 6l12 12M6 18 18 6"></path></symbol><symbol id="ui-trash" viewBox="0 0 24 24"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"></path></symbol><symbol id="ui-expand" viewBox="0 0 24 24"><path d="M14 3h7v7M21 3l-8 8M10 21H3v-7M3 21l8-8"></path></symbol><symbol id="ui-chevron" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"></path></symbol><symbol id="ui-external" viewBox="0 0 24 24"><path d="M14 3h7v7M21 3l-9 9M10 3H3v18h18v-7"></path></symbol><symbol id="ui-image" viewBox="0 0 24 24"><path d="M3 5h16v4H3Z" fill="currentColor" fill-opacity=".12" stroke="none"></path><path d="M5 3h16v16M3 5h16v16H3Z M3 16l5-5 4 4 3-3 4 4M13 9h.01"></path></symbol><symbol id="ui-edit" viewBox="0 0 24 24"><path d="M16 3l5 5M4 20l4-1L21 6l-4-4L4 15v5Z"></path></symbol><symbol id="ui-video" viewBox="0 0 24 24"><path d="M3 7h18v4H3Z" fill="currentColor" fill-opacity=".12" stroke="none"></path><path d="M3 7h18v14H3Z M3 7V3h18v4M6 3l-2 4M12 3l-2 4M18 3l-2 4M10 11l5 3-5 3Z"></path></symbol><symbol id="ui-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 17v4h16v-4"></path></symbol><symbol id="ui-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></symbol><symbol id="ui-note" viewBox="0 0 24 24"><path d="M5 3h14v4H5Z" fill="currentColor" fill-opacity=".12" stroke="none"></path><path d="M5 3h14v14l-4 4H5Z M15 21v-4h4M8 7h8M8 11h8M8 15h4"></path></symbol><symbol id="ui-arrow" viewBox="0 0 24 24"><path d="M12 20V4M5 11l7-7 7 7"></path></symbol><symbol id="ui-spark" viewBox="0 0 24 24"><path d="M3 15h18v5H3Z" fill="currentColor" fill-opacity=".12" stroke="none"></path><path d="M3 9V4h5M3 15v5h5M16 4h5v5M21 15v5h-5M7 16l4-5 3 3 2-2 3 4M11 4v4M9 6h4"></path></symbol><symbol id="ui-select" viewBox="0 0 24 24"><path d="M4 3l15 9-7 2-3 7Z"></path></symbol><symbol id="ui-hand" viewBox="0 0 24 24"><path d="M7 12V6a1.5 1.5 0 0 1 3 0v5-7a1.5 1.5 0 0 1 3 0v7-6a1.5 1.5 0 0 1 3 0v6-3a1.5 1.5 0 0 1 3 0v7c0 5-3 7-6 7h-1c-2 0-3-1-5-4l-3-5a1.5 1.5 0 0 1 2-2l2 2Z"></path></symbol><symbol id="ui-assistant" viewBox="0 0 24 24"><path d="M5 4h14v12H9l-5 4V4Z M8 9h8M8 12h5M19 18h3M20.5 16.5v3"></path></symbol><symbol id="ui-undo" viewBox="0 0 24 24"><path d="M8 5l-5 5 5 5M3 10h10a7 7 0 0 1 7 7"></path></symbol><symbol id="ui-minus" viewBox="0 0 24 24"><path d="M5 12h14"></path></symbol><symbol id="ui-director" viewBox="0 0 24 24"><path d="M3 7h18v14H3Z M3 7V3h18v4M6 3l-2 4M12 3l-2 4M18 3l-2 4M7 12h10M7 16h6"></path></symbol><symbol id="ui-repair" viewBox="0 0 24 24"><path d="M3 9V4h5M3 15v5h5M16 4h5v5M21 15v5h-5M8 16l3-7 3 1-2 7Z M11 9l2-4 3 1-2 4"></path></symbol></svg><div class="app" x-cloak x-data="film()" :class="assistant?'assistant-open':''" @keydown.window="keydown($event)" @keyup.space.window="spaceDown=false" @keydown.escape.window="closeSurface()" @keydown.tab.window="trap($event)">
-<header :inert="!!panel||fullEditor||!projectReady||directorAdopting">
-<a class="brand" href="/?projects=1" aria-label="创作项目"><b>m</b></a>
-<div class="project-identity"><span x-show="!projectReady" x-text="projectStatus"></span><div class="workspace-picker" x-show="projectReady" @click.outside="workspaceMenu=false" @keydown.escape.stop="workspaceMenu=false;$refs.workspaceTrigger.focus()">
-<button class="workspace-switch" x-ref="workspaceTrigger" aria-label="切换创作项目" aria-haspopup="dialog" :aria-expanded="workspaceMenu" @click="toggleWorkspaceMenu()"><span x-text="projectName"></span><span>⌄</span></button>
-<div class="workspace-menu" x-show="workspaceMenu" x-cloak x-transition.opacity.duration.120ms role="dialog" aria-label="选择创作项目">
-<label><input x-ref="workspaceSearch" x-model="workspaceQuery" placeholder="搜索项目名称" aria-label="搜索项目名称" @keydown.arrow-down.prevent="$el.closest('.workspace-menu').querySelector('[role=option]')?.focus()"></label>
-<div class="workspace-options" role="listbox" aria-label="创作项目" @keydown.arrow-down.prevent="$event.target.nextElementSibling?.focus()" @keydown.arrow-up.prevent="$event.target.previousElementSibling?.focus()">
-<template x-for="p in searchedWorkspaces" :key="p.id"><button role="option" :aria-selected="p.id===workspaceId" :disabled="workspaceSwitching" @click="switchWorkspace(p.id)"><span x-text="p.id===workspaceId?projectName:shortStudioName(p.name)"></span><small x-text="(p.id===workspaceId?'当前项目 · ':'')+workspaceDescription(p)"></small></button></template></div>
-<p x-show="workspaceListBusy" role="status">正在更新项目…</p><p x-show="workspaceListError" role="alert"><span x-text="workspaceListError"></span><button @click="loadWorkspaceList()">重试</button></p><p x-show="!workspaceListBusy&&!workspaceListError&&!searchedWorkspaces.length" x-text="workspaceQuery?'没有匹配的项目':'暂无其他项目'"></p>
-</div></div><span class="save-dot" :class="{'saving':projectStatus==='正在保存'||projectStatus==='等待保存','save-warning':!!(projectError||saveError)}" :title="projectError||saveError||projectStatus" role="status" :aria-label="projectError||saveError||projectStatus"></span></div>
-<nav><button :class="view==='canvas'?'active':''" @click="view='canvas'">画布</button><button :class="view==='assemble'?'active':''" @click="view='assemble'">剪辑 / 导出 <i x-text="adoptedSeconds+'s'"></i></button></nav>
-<div class="header-right"><button class="project-progress-entry" aria-label="项目资料" @click="showProject()"><span class="project-entry-full">项目资料</span><span class="project-entry-short">资料</span></button><a @click="openFullChat($event)" :href="'/?workspace='+workspaceId+'&target='+encodeURIComponent(quote?.targetId||active||'')" :aria-busy="chatOpening" ><span x-text="chatOpening?'打开中…':'创作助手'">创作助手</span><svg x-show="!chatOpening" class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-external"></use></svg></a><button @click="askSelection()"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-director"></use></svg><span>导演助手</span></button></div></header>
-<div class="save-error" x-show="(saveError||projectError)&&projectReady&&!panel&&!fullEditor" x-cloak role="alert"><div><strong x-text="projectConflict?'有更新待处理':'保存需要处理'"></strong><span x-text="projectConflict?'当前编辑已保留，可在项目资料中恢复。':projectError||saveError"></span></div><button @click="retryProjectSave()" :disabled="chatOpening" x-text="projectConflict?'查看':pendingChatHref?'重试打开创作助手':'重试'">查看</button></div>
-<section class="project-load-state" x-show="!projectReady" x-cloak :class="projectPreview?'has-preview':''" aria-live="polite">
-  <div><span class="load-indicator" x-show="projectLoading"></span><strong x-text="projectError?'项目暂时无法读取':projectPreview?'正在核对最新进度':'正在打开创作画布'"></strong><p x-text="projectError|| (projectPreview?'已显示最近保存的画布，核对完成后即可编辑。':'先读取项目内容，视频和生成记录会随后加载。')"></p><div x-show="!projectLoading"><button class="outline" @click="loadSharedProject()">重新读取项目</button><a href="/?projects=1">返回项目列表</a></div></div>
-</section>
-<main :inert="!!panel||fullEditor||!projectReady||directorAdopting">
-<section class="canvas compact-canvas" :class="{'director-framing':directorFraming&&!drag}" x-show="view==='canvas'&&(projectReady||projectPreview)" x-ref="world" @pointerdown.self="dragStart($event,null)" @click.self="backgroundClick()" @pointermove="connectionDraft?moveConnection($event):dragMove($event)" @pointerup="connectionDraft?endConnection($event):dragEnd()" @pointercancel="connectionDraft=null;dragEnd()" @wheel="wheel($event)">
-<div class="creation-dock" x-show="!compactViewport||!composerTask" aria-label="添加创作内容"><button class="dock-add" @click="addMenu=!addMenu" :aria-expanded="addMenu" aria-label="添加到画布"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-plus"></use></svg></button><button @click="$refs.import.click()" aria-label="添加图片素材"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-image"></use></svg><span>素材</span></button><button @click="addImageGeneration()" aria-label="添加图片生成节点"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-spark"></use></svg><span>生图</span></button><button @click="addShot()" aria-label="添加视频片段"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-video"></use></svg><span>视频</span></button><button @click="addNote()" aria-label="添加创意备注"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-note"></use></svg><span>备注</span></button><input type="file" x-ref="import" accept="image/png,image/jpeg,image/webp" hidden @change="importImage($event)"><div class="add-popover" x-show="addMenu" x-cloak @click.outside="addMenu=false"><strong>添加节点</strong><button @click="$refs.import.click()">＋ 上传图片</button><button @click="addImageGeneration()">＋ 生成图片</button><button @click="addShot();addMenu=false">＋ 视频节点</button><button @click="addNote()">＋ 创意备注</button><button @click="addNarration()">＋ 口播稿</button></div></div>
-<div class="world" :style="'--inverse-zoom:'+(1/zoom)+';transform:translate('+pan.x+'px,'+pan.y+'px) scale('+zoom+')'" @pointerdown.self="dragStart($event,null)" @click.self="backgroundClick()">
-<div class="connections"><svg class="edge-layer" width="10000" height="10000"><path class="edge-preview" x-show="connectionDraft" :d="connectionPreview()"></path></svg><template x-for="edge in canvasEdges()" :key="edge.id"><svg class="edge-layer" width="10000" height="10000"><g :data-edge-id="edge.id" :class="{'edge-active':edgeActive(edge),'edge-result':edge.kind==='result'}"><path class="edge-hit" :d="edge.path" @pointerdown.stop @click.stop="selectEdge(edge)"></path><path class="edge-path" :d="edge.path"></path><path class="edge-flow" :d="edge.path" pathLength="100" aria-hidden="true"></path></g></svg></template></div>
-<template x-for="a in assets" :key="a.id"><article class="asset node enter" :data-object-id="a.id" :class="{'selected':selectedIds.includes(a.id),'pending':a.pending}" :style="'left:'+a.x+'px;top:'+a.y+'px;width:'+a.w+'px'" @pointerdown="dragStart($event,a.id)" @click="if(!dragClick)choose(a.id)"><button class="node-port port-out" :style="'top:'+(34+a.h/2-6)+'px'" @pointerdown.stop="startConnection($event,a.id)" @click.stop="if(!connectionDraft)connectionDraft={from:a.id,point:portPoint(a.id,'out')}" :aria-label="'连接图片：'+a.name" title="连接视频节点"></button><div class="node-label"><span class="node-type-label"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-image"></use></svg><span :title="a.name" x-text="a.name"></span></span><small>9:16</small><button class="node-delete" @click.stop="removeNodes([a.id])" :aria-label="'删除节点：'+a.name">×</button></div><template x-if="!a.pending"><button class="asset-image" :style="'height:'+a.h+'px'" @click="if(!dragClick)selectAsset(a.id,$event)" :aria-label="'选择'+a.name"><img draggable="false" @dragstart.prevent :src="displayFile(a.file)" :alt="a.name"></button></template><template x-if="a.pending"><div class="pending-body" :style="'height:'+a.h+'px'"><template x-if="a.imageJob?.output"><img class="generated-preview" :src="displayFile(a.imageJob.output)" :alt="a.name"></template><div x-show="!a.imageJob?.output"><span>◈</span><p x-text="a.imageJob?projectStateLabel(a.imageJob.state):a.generationDraft?'描述想生成的画面':a.purpose"></p></div></div></template><button class="resize-handle" x-show="selectedIds.includes(a.id)&&!a.pending" @pointerdown.stop.prevent="resizeStart($event,a.id)" @pointermove.stop="dragMove($event)" @pointerup.stop="dragEnd()" :aria-label="'调整'+a.name+'尺寸'"><svg viewBox="0 0 16 16"><path d="m4 12 8-8M8 12l4-4"/></svg></button></article></template>
-<template x-for="s in shots" :key="s.id">
-  <article class="video-task media-task node" :data-object-id="s.id" :class="{'selected-node':selectedIds.includes(s.id)}" :style="'left:'+s.x+'px;top:'+s.y+'px;width:'+mediaSize().w+'px'" @pointerdown="dragStart($event,s.id)" @click="if(!dragClick){active=s.id;choose(s.id);persist()}">
-    <button class="node-port port-in" :style="'top:'+(34+mediaSize().h/2-6)+'px'" @pointerdown.stop @click.stop="if(connectionDraft){const from=connectionDraft.from;connectionDraft=null;connectNodes(from,s.id)}else showInputConnection(s.id)" :aria-label="'输入端口：'+s.name" title="连接首帧或参考图"></button>
-    <span class="node-port port-out result-port" :style="'top:'+(34+mediaSize().h/2-6)+'px'"></span>
-    <div class="node-label"><span :title="s.name" x-text="'镜头设置 · '+s.name"></span><small x-text="'9:16 · 5s'"></small><button class="node-delete" @click.stop="removeNodes([s.id])" :aria-label="'删除节点：'+s.name">×</button></div>
-    <div class="task-media" :style="'height:'+mediaSize().h+'px'">
-      <template x-if="shotPreview(s)"><img draggable="false" :src="shotPreview(s)" :alt="s.name"></template>
-      <div class="empty-media" x-show="!shotPreview(s)"><span>▷</span><p>连接一张图片</p></div>
-      <span class="media-state" x-show="latestShotJob(s)" x-text="latestShotJob(s)?videoState(latestShotJob(s)):''"></span>
-    </div>
-  </article>
-</template>
-<template x-for="job in visibleVideoJobs" :key="job.id">
-  <article class="real-video-node media-result node" :data-video-job="job.id" :data-object-id="'video-'+job.id" :class="{'selected-node':selectedIds.includes('video-'+job.id)}" @pointerdown="dragStart($event,'video-'+job.id)" @click="if(!dragClick)choose('video-'+job.id)" :style="'left:'+videoPosition(job).x+'px;top:'+videoPosition(job).y+'px;width:'+mediaSize().w+'px'">
-    <span class="node-port port-in video-result-port" :style="'top:'+(34+mediaSize().h/2-6)+'px'"></span>
-    <div class="node-label"><span :title="job.name" x-text="'视频结果 · '+job.name"></span><small x-text="videoAdopted(job)?'已采用':'5s'"></small><button class="node-delete" @click.stop="removeNodes(['video-'+job.id])" :aria-label="'收起结果：'+job.name">×</button></div>
-    <div class="task-media" :style="'height:'+mediaSize().h+'px'"><video x-show="job.media" :src="job.media" :poster="displayFile(job.image)" controls playsinline preload="metadata"></video><div class="empty-media" x-show="!job.media"><span>▷</span><p x-text="job.error||videoState(job)"></p></div></div>
-  </article>
-</template>
-<template x-for="n in notes" :key="n.id"><article class="plan-node node enter" :data-object-id="n.id" :class="selectedIds.includes(n.id)?'selected-node':''" :style="'left:'+n.x+'px;top:'+n.y+'px;width:'+n.w+'px'" @pointerdown="dragStart($event,n.id)"><button class="node-port port-out" @pointerdown.stop="startConnection($event,n.id)" @click.stop="if(!connectionDraft)connectionDraft={from:n.id,point:portPoint(n.id,'out')}" :aria-label="'连接创意：'+n.title" title="拖到片段输入，作为创意依据"></button><div class="node-label"><span>创意备注</span><span x-show="n.source">讨论来源 ↗</span><button class="node-delete" @click.stop="removeNodes([n.id])" :aria-label="'删除节点：'+n.title" title="删除节点，可撤销">×</button></div><button class="plan-content" @click="if(!dragClick){choose(n.id);editedNote=n.id;panel='note'}"><h3 x-text="n.title"></h3><p x-text="n.text||'从一个想法开始，不必先填完生成参数。'"></p><small x-text="n.source?.type==='chat'?'来自创作助手 · 已保留来源':n.source?'来自导演讨论 · 已保留来源':'画布中的创意'"></small></button></article></template>
-<div class="marquee" x-show="marquee" x-cloak :style="marquee?'left:'+marquee.x+'px;top:'+marquee.y+'px;width:'+marquee.w+'px;height:'+marquee.h+'px':''"></div>
-<template x-if="!narrationNode.removed"><article class="narration-node node" data-object-id="narration" :style="'left:'+narrationNode.x+'px;top:'+narrationNode.y+'px;width:300px'" @pointerdown="dragStart($event,'narration')"><div class="row spread"><span class="eyebrow">成片口播</span><button class="node-delete" @click.prevent.stop="removeNarration()" aria-label="删除节点：口播稿">×</button></div><button class="narration-open" @click="panel='script'"><span x-text="voice?'编辑口播稿':'添加口播'"></span><span> ↗</span></button></article></template>
-</div><div class="selection-toolbar context-toolbar" x-ref="contextToolbar" x-show="showContextToolbar&&!assistant" x-cloak :style="floatingStyle('toolbar')" @pointerdown.stop>
-  <template x-if="selectedIds.length===1&&composerAsset&&!composerAsset.pending"><div class="selection-actions"><button @click="startImageEdit()"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-repair"></use></svg><span>修图</span></button><button @click="openEdit()"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-edit"></use></svg><span>精细编辑</span></button><button @click="makeVideoFromImage()"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-video"></use></svg><span>生成视频</span></button><a :href="displayFile(composerAsset.file)" download><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-download"></use></svg><span>下载</span></a></div></template>
-  <template x-if="selectedIds.length===1&&composerShot"><div class="selection-actions"><button @click="openClip(composerShot.id)">编辑镜头</button><button @click="openDirectorSelection()"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-director"></use></svg><span>导演讨论</span></button><button x-show="selection.startsWith('video-')||latestShotJob(composerShot)?.state==='succeeded'" @click="reviewVideoId=selection.startsWith('video-')?selection.slice(6):latestShotJob(composerShot).id;panel='video-review'">核对与采用</button><button @click="modelMenu=false;choose(composerShot.id)">↻ 再次生成</button></div></template>
-  <template x-if="selectedIds.length===1&&notes.some(n=>n.id===selection)"><div class="selection-actions"><button @click="editedNote=selection;panel='note'">编辑备注</button><button @click="noteToShot()">建立视频节点</button></div></template>
-  <button class="delete-selected" x-show="!composerTask||selectedIds.length>1" @click="removeNodes()" aria-label="删除选中节点" title="删除选中节点"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-trash"></use></svg></button>
-</div>
-<div class="node-composer" :class="{'menu-open':modelMenu}" x-ref="composer" x-show="composerTask&&selectedIds.length===1&&!assistant" x-cloak :style="floatingStyle('composer')" @pointerdown.stop @wheel.stop>
-  <div class="composer-top"><div class="composer-heading"><strong :title="composerObject?.name" x-text="composerObject?.name||'图片编辑'"></strong><span x-show="composerTask==='video'&&selection.startsWith('video-')">重新生成</span></div><div class="composer-actions"><button class="composer-more-trigger" x-ref="composerMoreTrigger" @click="toggleComposerMore()" @keydown.down.prevent="composerMore=true;$nextTick(()=>focusComposerAction())" :aria-expanded="composerMore" aria-label="更多节点操作">更多</button><button class="composer-dismiss" @click="clearCanvasSelection()" aria-label="收起节点编辑"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-close"></use></svg></button></div>
-    <div class="composer-more" x-ref="composerMore" @keydown.down.prevent="focusComposerAction(1)" @keydown.up.prevent="focusComposerAction(-1)" x-show="composerMore" @click.outside="composerMore=false" x-transition.opacity.duration.120ms role="menu" aria-label="节点操作">
-      <button role="menuitem" x-show="composerTask==='video'&&(selection.startsWith('video-')||latestShotJob(composerShot)?.state==='succeeded')" @click="composerMore=false;reviewVideoId=selection.startsWith('video-')?selection.slice(6):latestShotJob(composerShot).id;panel='video-review'">核对与采用视频</button>
-      <button role="menuitem" x-show="composerTask==='video'" @click="composerMore=false;openDirectorSelection()">与导演讨论</button>
-      <button role="menuitem" x-show="composerTask==='edit'" @click="composerMore=false;makeVideoFromImage()">用图片生成视频</button>
-      <a role="menuitem" x-show="composerTask==='edit'" :href="displayFile(composerAsset?.file)" download>下载图片</a>
-      <button role="menuitem" x-show="composerTask!=='generate'" @click="composerMore=false;composerTask==='video'?openClip(composerShot.id):openEdit()">完整编辑</button>
-      <button role="menuitem" class="composer-remove" @click="composerMore=false;removeNodes()">删除节点</button>
-    </div>
-  </div>
-  <div class="composer-references" x-show="composerTask!=='generate'">
-    <div class="composer-modes" x-show="composerTask==='video'" aria-label="图片输入方式"><button :class="composerShot?.mode==='first'?'on':''" @click="setInputMode('first')">首帧</button><button :class="composerShot?.mode==='reference'?'on':''" @click="setInputMode('reference')">参考图</button></div>
-    <button class="reference-add" x-ref="referenceTrigger" x-show="composerTask==='video'" @click="referenceMenu=!referenceMenu" :aria-expanded="referenceMenu">＋ 参考</button>
-    <template x-for="(a,index) in composerRefs()" :key="a.id"><button class="reference-thumb" :title="a.name" :aria-label="a.name" @click="choose(a.id);focusObject(a.id)"><img :src="displayFile(a.file)" :alt="a.name"><b x-text="index+1"></b></button></template>
-    <div class="reference-picker" :style="referenceMenuStyle" x-show="referenceMenu" @click.outside="referenceMenu=false"><template x-for="a in assets.filter(a=>!a.pending)" :key="a.id"><button @click="addReference(a.id)"><img :src="displayFile(a.file)" :alt="a.name"><span x-text="a.name"></span></button></template><p x-show="!assets.some(a=>!a.pending)">先添加图片素材</p></div>
-  </div>
-  <div class="composer-prompt-heading"><label x-text="composerTask==='video'?'镜头提示词':composerTask==='generate'?'画面描述':'修改要求'"></label><button class="prompt-optimize" :disabled="directorStatus==='saving'||composerBusy()" @click="openDirectorSelection(composerTask==='video'?'optimize':composerTask==='generate'?'optimize-generate':'optimize-edit')" x-text="directorStatus==='saving'?'正在打开…':'优化提示词'"></button></div>
-  <template x-if="composerTask==='video'"><textarea class="composer-prompt" aria-label="视频生成提示词" x-model="composerShot.prompt" @input="composerShot.dirty=true;persist()" placeholder="描述画面、动作和镜头运动…"></textarea></template>
-  <template x-if="composerTask==='generate'||composerTask==='edit'"><textarea class="composer-prompt" :aria-label="composerTask==='generate'?'图片生成提示词':'图片编辑提示词'" x-model="composerAsset.imagePrompt" @input="if(composerTask==='edit')composerAsset.imageEditPrompt=composerAsset.imagePrompt;persist()" :placeholder="composerTask==='generate'?'描述你想生成的画面…':'描述要修改的部分，以及需要保留的外观…'"></textarea></template>
-  <p class="reference-warning" x-show="referenceWarning" x-text="referenceWarning" role="status"></p><div class="composer-bottom">
-    <div class="model-control"><button class="model-trigger" x-ref="modelTrigger" @click="modelMenu=!modelMenu" :aria-expanded="modelMenu" aria-label="选择下次生成模型"><span class="provider-symbol" x-text="selectedModel().provider==='minimax'?'◉':'◈'"></span><span x-text="selectedModel().label||'读取模型…'"></span><span>⌄</span></button>
-      <div class="model-menu" :style="modelMenuStyle" x-show="modelMenu" x-cloak @click.outside="modelMenu=false" role="menu" aria-label="任务模型列表"><div class="model-menu-heading" x-text="composerTask==='video'?'视频模型':composerTask==='edit'?'修图模型':'图片模型'"></div><p class="model-empty" x-show="!modelsFor(composerTask).length"><span x-text="modelListBusy?'正在读取模型…':modelListError||'模型列表暂未读取'"></span><button @click="loadModels()" :disabled="modelListBusy">重试读取</button></p><template x-for="m in modelsFor(composerTask)" :key="m.provider+':'+m.model"><button role="menuitemradio" :aria-checked="selectedModel().model===m.model" :disabled="!m.configured" :class="selectedModel().model===m.model?'chosen':''" @click="setModel(m)" :data-model="m.model"><span class="model-icon" x-text="m.provider==='minimax'?'◉':'◈'"></span><span><strong x-text="m.label"></strong><small x-text="m.detail"></small></span><span class="model-mark" x-text="!m.configured?'未配置':selectedModel().model===m.model?'✓':''"></span></button></template></div>
-    </div>
-    <span class="composer-params" x-text="composerTask==='video'?'9:16 · '+(selectedModel().resolution||'')+' · 5s':'9:16 · 1张'"></span>
-    <button class="composer-submit" :class="composerTask==='video'?'video-submit':''" @click="submitComposer()" :disabled="composerBusy()||!selectedModel().configured||!!referenceWarning" :aria-label="composerTask==='video'?'生成视频':composerTask==='generate'?'生成图片':'执行修图'" :aria-busy="composerBusy()"><span x-show="composerBusy()" class="composer-spinner" aria-hidden="true"></span><span x-show="!composerBusy()" x-text="composerTask==='video'?'生成视频':'↑'"></span><span class="visually-hidden" x-show="composerBusy()" x-text="composerProgress()"></span></button>
-  </div>
-  <p class="composer-cost" x-text="composerEstimate()" title="按模型标价与生成用量估算，实际金额以供应商账单为准"></p>
-  <div class="composer-feedback" x-show="composerError||composerImageJob||composerBusy()"><p role="status" x-text="composerError||composerImageJob?.error||composerProgress()"></p><button x-show="composerImageJob?.state==='succeeded'" :data-result="composerImageJob?.output" :data-task="composerTask" @click="adoptComposerImage()" x-text="composerTask==='generate'?'采用图片':'对比与采用'"></button></div>
-</div>
-<div class="edge-toolbar" x-show="selectedEdge" x-cloak><span x-text="selectedEdge?.editable?'所选连接':'生成来源'"></span><button x-show="selectedEdge?.editable" @click="disconnectEdge()">断开连接</button><button @click="selectedEdge=null">关闭</button></div><div class="connection-hint" x-show="connectionDraft" x-cloak>拖到视频片段左侧端口 · Esc 取消</div><div class="canvas-controls"><button :class="tool==='hand'?'active':''" @click="tool='hand'" aria-label="平移工具"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-hand"></use></svg></button><button :class="tool==='select'?'active':''" @click="tool='select'" aria-label="框选工具"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-select"></use></svg></button><button :disabled="!history.length" @click="undo()" aria-label="撤销画布修改"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-undo"></use></svg></button><button @click="zoomAt(-.1)" aria-label="缩小画布"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-minus"></use></svg></button><span x-text="Math.round(zoom*100)+'%'"></span><button @click="zoomAt(.1)" aria-label="放大画布"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-plus"></use></svg></button><button @click="organizeLayout()" title="按备注、素材和镜头整理，可撤销">整理</button><button @click="fit()" title="查看全部节点">全览</button></div>
-</section>
-<section class="assembly" x-show="view==='assemble'" x-cloak>
-<div class="assembly-grid"><section class="preview-workspace"><div class="preview-caption"><span x-text="currentRender?'成片预览':'片段预览'"></span><span>9:16</span></div><div class="film-screen"><template x-if="assemblyPreview"><video :key="assemblyPreview" :src="assemblyPreview" controls playsinline preload="metadata" aria-label="剪辑预览"></video></template><div class="preview-empty" x-show="!assemblyPreview"><span>▷</span><p>采用视频后在这里预览</p><button @click="view='canvas'">选择片段</button></div></div><div class="preview-meta"><span x-text="currentRender?'MP4 · H.264 · '+currentRender.duration+'s':''"></span><span x-show="videoRenders.some(r=>r.state==='running')" role="status">正在合成…</span></div></section>
-<aside><h3>导出设置</h3><dl><dt>画幅</dt><dd>9:16</dd><dt>分辨率</dt><dd>720 × 1280</dd><dt>格式</dt><dd>MP4 / H.264</dd><dt>时长</dt><dd x-text="adoptedSeconds+' 秒'"></dd></dl><div class="export-duration"><span x-text="'已采用 '+videoSequence.length+' 段 · '+adoptedSeconds+' / '+targetSeconds+' 秒'"></span><button @click="view='canvas'">选择片段 ↗</button></div><button class="primary full" x-text="videoBusy?'处理中…':currentRender?'重新合成':'合成视频'" @click="renderVideo()" :disabled="videoBusy||!adoptedSeconds||videoRenders.some(r=>r.state==='running')">合成视频</button><a class="download-film primary" x-show="currentRender" :href="currentRender?.media+'?download=1'" download>下载 MP4 ↓</a><p class="subtle">本地合成 · 原视频保留</p><button class="outline full" @click="exportPlan()">导出项目 JSON</button><p role="alert" x-show="videoError" x-text="videoError"></p><template x-for="r in videoRenders.filter(r=>r.state==='failed')" :key="r.id"><p x-text="r.error"></p></template></aside></div>
-<section class="timeline"><div class="timeline-heading"><h3>视频轨道</h3><span x-text="adoptedSeconds+'s / '+targetSeconds+'s'"></span></div><div class="real-timeline"><template x-for="(s,index) in videoSequence" :key="s.job"><button :class="{'active':assemblyClip===s.job||!assemblyClip&&index===0}" @click="assemblyClip=s.job" :aria-label="'预览片段：'+(s.video?.name||'已采用片段')"><img :src="displayFile(s.video?.image)" alt=""><span><strong x-text="s.video?.name||'已采用片段'"></strong><small x-text="(s.video?.output_duration||5)+'s'"></small></span><i x-text="String(index+1).padStart(2,'0')"></i></button></template><p x-show="!videoSequence.length">还没有采用的片段</p></div></section>
-</section>
-</main>
-<aside class="assistant live-director" x-show="assistant" x-cloak x-transition.opacity.duration.180ms :inert="!!panel||fullEditor||projectLoading||productionLoading"><div class="director-shell-heading"><h3>导演助手</h3><span role="status" x-show="directorStatus!=='confirmed'" x-text="directorStatus==='pending'?'待切换':directorStatus==='error'?'同步失败':'同步中…'"></span><button @click="closeDirector()" aria-label="收起导演助手">×</button></div><template x-if="assistant&&projectReady"><iframe x-ref="director" :src="directorUrl" title="真实导演项目对话" @load="syncDirectorTarget()"></iframe></template></aside>
-<div class="shade" x-show="panel" x-cloak @click.self="panel=''" @keydown.escape.window="panel=''" x-transition.opacity><section class="modal" :class="{'project-modal':panel==='project','clip-modal':panel==='clip'}" role="dialog" aria-modal="true" aria-label="视频创作编辑"><button class="close" @click="panel=''" aria-label="关闭编辑"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-close"></use></svg></button>
-<div x-show="panel==='project'" class="project-progress">
-<div class="project-heading"><div class="project-heading-meta"><span>项目资料</span><div class="project-save-state" :class="{'has-error':projectError}" role="status"><span x-text="projectStatus"></span><button x-show="projectError" @click="flushProject().catch(()=>{})">重试保存</button></div></div><h2 x-text="projectName"></h2></div>
-<nav class="project-tabs" aria-label="项目资料分类"><button :class="projectTab==='overview'?'active':''" @click="setProjectTab('overview')">项目概览</button><button :class="projectTab==='audit'?'active':''" @click="setProjectTab('audit')">模型与费用 <span x-text="audit.entries.length"></span></button><button :class="projectTab==='versions'?'active':''" @click="setProjectTab('versions')">版本</button></nav>
-<div class="project-scroll" :class="projectTab==='versions'?'versions-open':''"><div class="project-recovery" x-show="projectError||projectConflict"><p class="project-error" x-show="projectError" x-text="projectError" role="alert"></p><button class="outline" x-show="projectConflict" @click="preserveAndReadLatest()">备份并读取更新</button><button class="outline" x-show="projectBackupAvailable" @click="downloadProjectBackup()">下载编辑备份</button></div>
-<div x-show="projectTab==='overview'" class="project-overview"><div class="project-summary"><div><span>素材</span><strong x-text="assets.filter(a=>!a.pending).length+' 张'"></strong></div><div><span>镜头</span><strong x-text="shots.length+' 段'"></strong></div><div><span>已采用</span><strong x-text="adoptedSeconds+' / '+targetSeconds+' 秒'"></strong></div><div><span>成片</span><strong x-text="currentRender?'可下载':'未合成'"></strong></div></div>
-<div class="project-overview-grid"><div class="project-content">
-<label class="project-facts"><span>共同要求</span><textarea x-ref="projectFacts" x-model="facts" x-effect="facts;panel;compactViewport;$nextTick(()=>sizeProjectFacts())" maxlength="1000" @input="sizeProjectFacts()" @input.debounce.400ms="persist()" aria-label="项目共同要求" placeholder="产品事实、包装要求与创作边界"></textarea></label>
-<section class="project-section project-shots"><h3>镜头 <span x-text="shots.length"></span></h3><template x-for="s in shots" :key="s.id"><button class="project-object" @click="panel='';active=s.id;choose(s.id);focusObject(s.id)"><img :src="shotPoster(s)" alt=""><strong x-text="s.name"></strong><span x-text="!(s.mode==='first'?s.first:s.refs.length)?'待选画面':!s.prompt.trim()?'待写要求':latestShotJob(s)?videoState(latestShotJob(s)):'待生成'"></span><span class="project-row-arrow"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-chevron"></use></svg></span></button></template><p class="project-empty" x-show="!shots.length">还没有镜头</p></section>
-</div><aside class="project-settings" aria-label="生成设置与项目记录">
-<section class="studio-budget" aria-labelledby="studio-budget-title"><h3 id="studio-budget-title">图片生成次数</h3><div class="budget-availability"><strong x-text="Math.max(0,cloudBudget.limit-cloudBudget.reserved)"></strong><span>次可用</span><small x-text="'已预留 '+cloudBudget.reserved+' / '+cloudBudget.limit+' 次'"></small></div><label class="budget-label" for="studio-budget-limit">项目总上限</label><div class="studio-budget-control"><div class="budget-input"><input id="studio-budget-limit" type="number" min="0" :max="cloudBudgetMaximum" step="1" x-model.number="cloudCalls" :disabled="cloudBudgetSaving" @input="cloudBudgetError='';cloudBudgetMessage=''" aria-describedby="studio-budget-help"><span>次</span></div><button @click="saveCloudBudget()" :disabled="cloudBudgetSaving" x-text="cloudBudgetSaving?'保存中…':'保存上限'"></button></div><p id="studio-budget-help" x-text="cloudBudget.max_calls===undefined?cloudBudgetHelp:'可设 0–'+cloudBudgetMaximum+' 次。失败或未知任务仍计入次数。'"></p><p class="budget-feedback" role="status" x-show="cloudBudgetMessage" x-text="cloudBudgetMessage"></p><p class="budget-error" role="alert" x-show="cloudBudgetError" x-text="cloudBudgetError"></p></section>
-<section class="project-section project-activity"><h3>最近变更</h3><template x-for="event in projectEvents.slice(-4).reverse()" :key="event.id"><div class="project-event"><span x-text="event.label"></span><time x-text="new Date(event.at*1000).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})"></time></div></template><p class="project-empty" x-show="!projectEvents.length">暂无变更记录</p></section>
-<details class="project-backup" x-show="projectBackupAvailable"><summary><span>编辑备份</span><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-chevron"></use></svg></summary><time x-text="projectBackupTime?new Date(projectBackupTime).toLocaleString('zh-CN'):''"></time><p>保存冲突前保留的编辑。</p><button class="outline" @click="downloadProjectBackup()">下载备份</button></details>
-</aside></div></div>
-<div x-show="projectTab==='versions'" class="version-browser">
-  <aside class="version-targets"><nav aria-label="版本分类"><template x-for="category in versionCategories" :key="category.id"><button :class="versionCategory===category.id?'active':''" @click="selectVersionCategory(category.id)" :aria-pressed="versionCategory===category.id"><span x-text="category.name"></span></button></template></nav></aside>
-  <section class="version-history"><header><div><h3 x-text="versionTarget?versionTargets.find(t=>t.id===versionTarget)?.name:versionCategories.find(c=>c.id===versionCategory)?.name+'版本'"></h3><p>恢复保留其他版本，不会重新生成视频。</p></div><button class="outline" @click="loadContentVersions()" :disabled="versionsBusy" aria-label="刷新版本"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-undo"></use></svg></button></header><label class="version-search"><input x-model="versionQuery" aria-label="搜索版本内容" placeholder="查找内容名称，点击下方查看"></label><div class="version-target-chips"><button :class="!versionTarget?'active':''" @click="versionTarget='';loadContentVersions()">全部</button><template x-for="target in categoryVersionTargets" :key="target.id"><button :class="versionTarget===target.id?'active':''" @click="versionTarget=target.id;loadContentVersions()" :title="target.name"><span x-text="target.name"></span></button></template><p x-show="versionQuery&&!categoryVersionTargets.length">没有匹配的内容</p></div><p class="subtle" x-show="versionsBusy" role="status">正在更新版本…</p><p class="project-error" x-show="versionsError" role="alert"><span x-text="versionsError"></span><button @click="loadContentVersions()">重试读取</button></p>
-  <template x-for="v in visibleContentVersions" :key="v.id"><article class="content-version-row"><div class="version-preview"><template x-if="v.kind==='image'"><img :src="displayFile(v.data.file)" alt="版本缩略图" loading="lazy"></template><svg x-show="v.kind!=='image'" class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-note"></use></svg></div><div class="version-copy"><div class="version-row-title"><strong x-text="versionLabel(v)"></strong></div><small x-text="versionKind(v.kind,v.target)+(versionKind(v.kind,v.target)===v.label?'':' · '+v.label)+' · '+new Date(v.time*1000).toLocaleString('zh-CN')"></small><details x-show="!!v.data.text" @toggle="loadVersionDetail(v,$el.open)"><summary x-text="v.data.text?.slice(0,100)"></summary><p x-text="versionDetails[v.id]?.busy?'正在读取全文…':versionDetails[v.id]?.error||versionDetails[v.id]?.text||v.data.text"></p><button x-show="versionDetails[v.id]?.error" @click="loadVersionDetail(v,true)">重试全文</button></details></div><button class="outline" @click="restoreContentVersion(v)" :disabled="versionsBusy||((v.current||!versionAvailable(v))&&v.kind!=='video'&&v.kind!=='render')" x-text="v.kind==='video'?'查看':v.kind==='render'?'下载':!versionAvailable(v)?'节点已移除':v.current?'当前版本':'恢复'"></button></article></template>
-  <button class="version-more outline" x-show="contentVersions.length&lt;versionTotal" :disabled="versionsBusy" @click="loadContentVersions(true)">加载更多版本</button><div class="version-empty" x-show="!versionsBusy&&!versionsError&&!contentVersions.length"><h3>暂无版本记录</h3><p>保存图片、镜头要求或文案后，会在这里留下版本。</p></div></section>
-</div>
-<div x-show="projectTab==='audit'"><div class="audit-summary"><div><span>生成费用预估</span><strong x-text="audit.entries.length&amp;&amp;!audit.entries.some(e=>e.estimate_cny!=null)?'待估算':'¥'+audit.estimate_cny.toFixed(3).replace(/0$/,'')"></strong><small x-text="audit.unestimated_count?audit.unestimated_count+' 条记录信息不足':'全部生成记录均可估算'"></small></div><div><span>供应商实际扣费</span><strong>待账单核对</strong><small>未将估算当作实际费用</small></div></div><p class="audit-notice" x-text="audit.notice"></p><div class="audit-actions"><button @click="refreshAudit()">刷新记录</button><button @click="exportAudit()">导出审计 JSON</button><a href="https://help.aliyun.com/zh/model-studio/model-pricing" target="_blank" rel="noreferrer">官方价格 ↗</a></div><p class="project-error" x-show="auditError" x-text="auditError" role="alert"></p><p class="subtle" x-show="!audit.entries.length">尚无生成记录</p><template x-for="job in audit.entries" :key="job.id"><details class="audit-row"><summary><span class="audit-kind" x-text="job.kind==='video'?'视频':'修图'"></span><div><strong x-text="job.name"></strong><small x-text="job.model||'历史任务未记录模型'"></small></div><span class="audit-state" x-text="projectStateLabel(job.state)"></span><strong class="audit-price" x-text="auditAmount(job)"></strong><span class="audit-toggle" aria-hidden="true">⌄</span></summary><dl><dt>任务 ID</dt><dd x-text="job.id"></dd><dt>供应商任务 ID</dt><dd x-text="job.provider_request_id||'未返回'"></dd><dt>时间</dt><dd x-text="job.created_at?new Date(job.created_at*1000).toLocaleString('zh-CN'):'未记录'"></dd><dt>用量</dt><dd x-text="job.quantity+' '+job.unit"></dd><dt>地域</dt><dd x-text="job.region||'历史未记录'"></dd><dt>采用</dt><dd x-text="job.adopted?'已采用':'未采用（仍保留生成费用记录）'"></dd><dt>估算依据</dt><dd x-text="job.estimate_reason||'模型或用量待核对'"></dd><dt>参考单价</dt><dd x-text="job.unit_price_cny==null?'未知':'¥'+job.unit_price_cny+'/'+job.unit"></dd><dt>价格核对</dt><dd><span x-text="job.price_checked_at||'未核对'"></span> · <a :href="job.price_source" target="_blank" rel="noreferrer">供应商报价 ↗</a></dd><dt>实际金额</dt><dd>待供应商账单核对</dd></dl></details></template><p class="subtle audit-local">本地裁切、调整和合成不调用收费模型；Chat 文本用量另见模型供应商账单。</p></div>
-</div><div class="project-bottom"><a href="/?projects=1">项目列表</a><a @click="openFullChat($event)" :href="'/?workspace='+workspaceId+'&target='+encodeURIComponent(active||'')"><span>创作助手</span><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ui-external"></use></svg></a><button @click="panel=''">回到画布</button></div></div>
-<template x-if="panel==='note'&&note"><div class="narrow"><span class="eyebrow">创意备注</span><h2>记录创意，作为镜头依据</h2><p class="subtle">保留从 Chat 带来的想法。连接到片段后可回看依据；图片和运动要求在片段中设置。</p><label>备注标题<input aria-label="备注标题" x-model="note.title"></label><label>想法与要求<textarea aria-label="备注正文" x-model="note.text"></textarea></label><a class="note-source" x-show="note?.source?.type==='chat'" :href="'/?chat=1&workspace='+workspaceId+'&session='+note?.source?.sessionId+'&message=row-'+note?.source?.messageId">回到原讨论 ↗</a><p class="subtle" x-show="note?.source" x-text="'来自：'+(note?.source?.label||'自由讨论')"></p><div class="modal-actions"><button @click="panel=''">回到画布</button><button class="primary" @click="saveNote()">保存备注</button></div></div></template>
-<template x-if="panel==='clip'&&clipEdit"><div class="clip-editor">
-<span class="eyebrow">编辑视频片段</span><h2>选一张画面，说说它怎么动</h2>
-<div class="clip-edit-grid"><section class="clip-image-picker"><div class="row spread"><h3>用哪张画面</h3><div class="studio-segmented" role="group" aria-label="图片使用方式"><button @click="clipEdit.mode='first'" :aria-pressed="clipEdit.mode==='first'">首帧</button><button @click="clipEdit.mode='reference'" :aria-pressed="clipEdit.mode==='reference'">多图参考</button></div></div>
-<div class="clip-image-options"><template x-for="a in clipAssets" :key="a.id"><button :class="clipHasImage(a.id)?'chosen':''" @click="clipChooseImage(a.id)" :aria-pressed="clipHasImage(a.id)" :aria-label="'用这张图：'+a.name"><img :src="displayFile(a.file)" :alt="a.name"><span x-text="a.name"></span><b x-show="clipHasImage(a.id)">✓</b></button></template></div>
-<p x-show="!clipAssets.length">先把产品图或参考图放到画布。</p><button class="outline" x-show="!clipAssets.length" @click="panel='';$refs.import.click()">上传一张图片</button>
-<p class="subtle" x-text="clipEdit.mode==='first'?'所选图片是视频的起始画面。':'选中的图片用来参考主体或场景，不会直接拼接成视频。'"></p></section>
-<section class="clip-direction"><div class="row clip-metadata"><label>片段名称<input x-model="clipEdit.name" aria-label="编辑片段名称"></label><label>时长<span class="clip-fixed-duration">5 秒</span></label></div>
-<label>画面里发生什么<textarea x-model="clipEdit.prompt" aria-label="画面变化" placeholder="例如：产品不动，水面慢慢泛起涟漪。先说你想看到什么，不必写专业提示词。"></textarea></label>
-<div class="direction-examples"><span>可以从一句话开始</span><button @click="clipExample('产品保持不动，背景水面缓慢泛起涟漪。')">水面轻轻动</button><button @click="clipExample('背景光线从暗到亮，逐渐照亮产品。')">光线慢慢亮</button><button @click="clipExample('产品缓慢转动，展示侧面轮廓。')">展示产品侧面</button></div>
-<label>镜头怎么走<span class="optional">可选</span></label><div class="camera-choices"><template x-for="c in ['固定机位','缓慢推近','缓慢拉远','从左向右移动']"><button :class="clipEdit.camera===c?'chosen':''" :aria-pressed="clipEdit.camera===c" @click="clipEdit.camera=clipEdit.camera===c?'':c" x-text="c"></button></template></div>
-<label>哪些地方要保持不变<span class="optional">可选</span><input x-model="clipEdit.keep" aria-label="保持不变的内容" placeholder="例如：瓶身外形、颜色、包装文字"></label>
-</section></div><div class="modal-actions"><button @click="panel=''">取消</button><button class="primary" @click="saveClip()">保存片段</button></div></div></template>
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>miniclaw · 视频创作</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script>
+      window.WORKSPACE_TOKEN = "__WORKSPACE_TOKEN__";
+      window.__HERMES_SESSION_TOKEN__ = window.WORKSPACE_TOKEN;
+    </script>
+    <script src="project-name.js"></script>
+    <script src="usability.js"></script>
+    <script src="workflow.js"></script>
+    <script src="app.js"></script>
+    <script src="integration.js"></script>
+    <script src="production.js"></script>
+    <script src="node-composer.js"></script>
+    <script src="interaction.js"></script>
+    <script defer src="vendor/alpine.min.js"></script>
+  </head>
+  <body>
+    <svg class="icon-definitions" aria-hidden="true">
+      <symbol id="ui-close" viewBox="0 0 24 24">
+        <path d="M6 6l12 12M6 18 18 6"></path>
+      </symbol>
+      <symbol id="ui-trash" viewBox="0 0 24 24">
+        <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"></path>
+      </symbol>
+      <symbol id="ui-expand" viewBox="0 0 24 24">
+        <path d="M14 3h7v7M21 3l-8 8M10 21H3v-7M3 21l8-8"></path>
+      </symbol>
+      <symbol id="ui-chevron" viewBox="0 0 24 24">
+        <path d="M9 5l7 7-7 7"></path>
+      </symbol>
+      <symbol id="ui-external" viewBox="0 0 24 24">
+        <path d="M14 3h7v7M21 3l-9 9M10 3H3v18h18v-7"></path>
+      </symbol>
+      <symbol id="ui-image" viewBox="0 0 24 24">
+        <path
+          d="M3 5h16v4H3Z"
+          fill="currentColor"
+          fill-opacity=".12"
+          stroke="none"
+        ></path>
+        <path d="M5 3h16v16M3 5h16v16H3Z M3 16l5-5 4 4 3-3 4 4M13 9h.01"></path>
+      </symbol>
+      <symbol id="ui-edit" viewBox="0 0 24 24">
+        <path d="M16 3l5 5M4 20l4-1L21 6l-4-4L4 15v5Z"></path>
+      </symbol>
+      <symbol id="ui-video" viewBox="0 0 24 24">
+        <path
+          d="M3 7h18v4H3Z"
+          fill="currentColor"
+          fill-opacity=".12"
+          stroke="none"
+        ></path>
+        <path
+          d="M3 7h18v14H3Z M3 7V3h18v4M6 3l-2 4M12 3l-2 4M18 3l-2 4M10 11l5 3-5 3Z"
+        ></path>
+      </symbol>
+      <symbol id="ui-download" viewBox="0 0 24 24">
+        <path d="M12 3v12M7 10l5 5 5-5M4 17v4h16v-4"></path>
+      </symbol>
+      <symbol id="ui-plus" viewBox="0 0 24 24">
+        <path d="M12 5v14M5 12h14"></path>
+      </symbol>
+      <symbol id="ui-note" viewBox="0 0 24 24">
+        <path
+          d="M5 3h14v4H5Z"
+          fill="currentColor"
+          fill-opacity=".12"
+          stroke="none"
+        ></path>
+        <path d="M5 3h14v14l-4 4H5Z M15 21v-4h4M8 7h8M8 11h8M8 15h4"></path>
+      </symbol>
+      <symbol id="ui-arrow" viewBox="0 0 24 24">
+        <path d="M12 20V4M5 11l7-7 7 7"></path>
+      </symbol>
+      <symbol id="ui-spark" viewBox="0 0 24 24">
+        <path
+          d="M3 15h18v5H3Z"
+          fill="currentColor"
+          fill-opacity=".12"
+          stroke="none"
+        ></path>
+        <path
+          d="M3 9V4h5M3 15v5h5M16 4h5v5M21 15v5h-5M7 16l4-5 3 3 2-2 3 4M11 4v4M9 6h4"
+        ></path>
+      </symbol>
+      <symbol id="ui-select" viewBox="0 0 24 24">
+        <path d="M4 3l15 9-7 2-3 7Z"></path>
+      </symbol>
+      <symbol id="ui-hand" viewBox="0 0 24 24">
+        <path
+          d="M7 12V6a1.5 1.5 0 0 1 3 0v5-7a1.5 1.5 0 0 1 3 0v7-6a1.5 1.5 0 0 1 3 0v6-3a1.5 1.5 0 0 1 3 0v7c0 5-3 7-6 7h-1c-2 0-3-1-5-4l-3-5a1.5 1.5 0 0 1 2-2l2 2Z"
+        ></path>
+      </symbol>
+      <symbol id="ui-assistant" viewBox="0 0 24 24">
+        <path d="M5 4h14v12H9l-5 4V4Z M8 9h8M8 12h5M19 18h3M20.5 16.5v3"></path>
+      </symbol>
+      <symbol id="ui-undo" viewBox="0 0 24 24">
+        <path d="M8 5l-5 5 5 5M3 10h10a7 7 0 0 1 7 7"></path>
+      </symbol>
+      <symbol id="ui-minus" viewBox="0 0 24 24">
+        <path d="M5 12h14"></path>
+      </symbol>
+      <symbol id="ui-director" viewBox="0 0 24 24">
+        <path
+          d="M3 7h18v14H3Z M3 7V3h18v4M6 3l-2 4M12 3l-2 4M18 3l-2 4M7 12h10M7 16h6"
+        ></path>
+      </symbol>
+      <symbol id="ui-repair" viewBox="0 0 24 24">
+        <path
+          d="M3 9V4h5M3 15v5h5M16 4h5v5M21 15v5h-5M8 16l3-7 3 1-2 7Z M11 9l2-4 3 1-2 4"
+        ></path>
+      </symbol>
+    </svg>
+    <div
+      class="app"
+      x-cloak
+      x-data="film()"
+      :class="{'assistant-open':assistant,'library-open':libraryOpen&&view==='canvas'}"
+      @keydown.window="keydown($event)"
+      @keyup.space.window="spaceDown=false"
+      @keydown.escape.window="closeSurface()"
+      @keydown.tab.window="trap($event)"
+    >
+      <header :inert="!!panel||fullEditor||!projectReady||directorAdopting">
+        <a class="brand" href="/projects" aria-label="创作项目"><b>m</b></a>
+        <div class="project-identity">
+          <span x-show="!projectReady" x-text="projectStatus"></span>
+          <div
+            class="workspace-picker"
+            x-show="projectReady"
+            @click.outside="workspaceMenu=false"
+            @keydown.escape.stop="workspaceMenu=false;$refs.workspaceTrigger.focus()"
+          >
+            <button
+              class="workspace-switch"
+              x-ref="workspaceTrigger"
+              aria-label="切换创作项目"
+              aria-haspopup="dialog"
+              :aria-expanded="workspaceMenu"
+              @click="toggleWorkspaceMenu()"
+            >
+              <span x-text="projectName"></span><span>⌄</span>
+            </button>
+            <div
+              class="workspace-menu"
+              x-show="workspaceMenu"
+              x-cloak
+              x-transition.opacity.duration.120ms
+              role="dialog"
+              aria-label="选择创作项目"
+            >
+              <label
+                ><input
+                  x-ref="workspaceSearch"
+                  x-model="workspaceQuery"
+                  placeholder="搜索项目名称"
+                  aria-label="搜索项目名称"
+                  @keydown.arrow-down.prevent="$el.closest('.workspace-menu').querySelector('[role=option]')?.focus()"
+              /></label>
+              <div
+                class="workspace-options"
+                role="listbox"
+                aria-label="创作项目"
+                @keydown.arrow-down.prevent="$event.target.nextElementSibling?.focus()"
+                @keydown.arrow-up.prevent="$event.target.previousElementSibling?.focus()"
+              >
+                <template x-for="p in searchedWorkspaces" :key="p.id"
+                  ><button
+                    role="option"
+                    :aria-selected="p.id===workspaceId"
+                    :disabled="workspaceSwitching"
+                    @click="switchWorkspace(p.id)"
+                  >
+                    <span
+                      x-text="p.id===workspaceId?projectName:shortStudioName(p.name)"
+                    ></span
+                    ><small
+                      x-text="(p.id===workspaceId?'当前项目 · ':'')+workspaceDescription(p)"
+                    ></small></button
+                ></template>
+              </div>
+              <p x-show="workspaceListBusy" role="status">正在更新项目…</p>
+              <p x-show="workspaceListError" role="alert">
+                <span x-text="workspaceListError"></span
+                ><button @click="loadWorkspaceList()">重试</button>
+              </p>
+              <p
+                x-show="!workspaceListBusy&&!workspaceListError&&!searchedWorkspaces.length"
+                x-text="workspaceQuery?'没有匹配的项目':'暂无其他项目'"
+              ></p>
+            </div>
+          </div>
+          <span
+            class="save-dot"
+            :class="{'saving':projectStatus==='正在保存'||projectStatus==='等待保存','save-warning':!!(projectError||saveError)}"
+            :title="projectError||saveError||projectStatus"
+            role="status"
+            :aria-label="projectError||saveError||projectStatus"
+          ></span>
+        </div>
+        <nav>
+          <button :class="view==='canvas'?'active':''" @click="view='canvas'">
+            画布</button
+          ><button
+            :class="view==='assemble'?'active':''"
+            @click="view='assemble'"
+          >
+            剪辑 / 导出 <i x-text="adoptedSeconds+'s'"></i>
+          </button>
+        </nav>
+        <div class="header-right">
+          <button
+            class="project-progress-entry"
+            aria-label="项目资料"
+            @click="showProject()"
+          >
+            <span class="project-entry-full">项目资料</span
+            ><span class="project-entry-short">资料</span></button
+          ><button @click="askSelection()">
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <use href="#ui-director"></use></svg
+            ><span>助手</span>
+          </button>
+        </div>
+      </header>
+      <div
+        class="save-error"
+        x-show="(saveError||projectError)&&projectReady&&!panel&&!fullEditor"
+        x-cloak
+        role="alert"
+      >
+        <div>
+          <strong
+            x-text="projectConflict?'有更新待处理':'保存需要处理'"
+          ></strong
+          ><span
+            x-text="projectConflict?'当前编辑已保留，可在项目资料中恢复。':projectError||saveError"
+          ></span>
+        </div>
+        <button
+          @click="retryProjectSave()"
+          :disabled="chatOpening"
+          x-text="projectConflict?'查看':pendingChatHref?'重试打开对话':'重试'"
+        >
+          查看
+        </button>
+      </div>
+      <section
+        class="project-load-state"
+        x-show="!projectReady"
+        x-cloak
+        :class="projectPreview?'has-preview':''"
+        aria-live="polite"
+      >
+        <div>
+          <span class="load-indicator" x-show="projectLoading"></span
+          ><strong
+            x-text="projectError?'项目暂时无法读取':projectPreview?'正在核对最新进度':'正在打开创作画布'"
+          ></strong>
+          <p
+            x-text="projectError|| (projectPreview?'已显示最近保存的画布，核对完成后即可编辑。':'先读取项目内容，视频和生成记录会随后加载。')"
+          ></p>
+          <div x-show="!projectLoading">
+            <button class="outline" @click="loadSharedProject()">
+              重新读取项目</button
+            ><a href="/projects">返回项目列表</a>
+          </div>
+        </div>
+      </section>
+      <section class="project-change-notice" x-show="projectChangeNotice" x-cloak role="status" aria-label="画布更新">
+        <span x-text="projectChangeMessage"></span>
+        <template x-for="change in projectChangeNotice?.changes||[]" :key="change.id">
+          <button @click="locateProjectChange(change)" x-text="change.label"></button>
+        </template>
+        <button x-show="projectChangeNotice?.status==='conflict'||projectChangeNotice?.status==='pending'" @click="preserveAndReadLatest()">备份并读取更新</button>
+        <button x-show="projectChangeNotice?.status==='error'" @click="refreshProjectChanges('重试')">重试</button>
+        <button @click="dismissProjectChange()" aria-label="收起更新通知">×</button>
+      </section>
+      <aside
+        class="library-rail"
+        x-show="view==='canvas'&&projectReady"
+        x-init="loadLibrary()"
+        :inert="!!panel||fullEditor||!projectReady||directorAdopting"
+        aria-label="素材库"
+      >
+        <div class="library-head">
+          <h3>素材库</h3>
+          <button
+            @click="libraryOpen=!libraryOpen"
+            :aria-expanded="libraryOpen"
+            :aria-label="libraryOpen?'收起素材库':'展开素材库'"
+            x-text="libraryOpen?'‹':'›'"
+          ></button>
+        </div>
+        <template x-if="libraryOpen"
+          ><div class="library-body">
+            <input
+              type="search"
+              x-model="libraryQuery"
+              @input.debounce.300ms="loadLibrary()"
+              placeholder="搜索素材"
+              aria-label="搜索素材"
+            />
+            <p x-show="libraryError" role="alert">
+              <span x-text="libraryError"></span
+              ><button @click="loadLibrary()">重试</button>
+            </p>
+            <div class="library-grid" :aria-busy="libraryBusy">
+              <template x-for="item in library" :key="item.id"
+                ><button
+                  @click="useLibraryItem(item)"
+                  :disabled="libraryBusy"
+                  :title="item.name"
+                  :aria-label="'加入画布：'+item.name"
+                >
+                  <img :src="item.url" :alt="item.name" loading="lazy" /></button
+              ></template>
+            </div>
+            <p
+              class="library-empty"
+              x-show="!libraryBusy&&!libraryError&&!library.length"
+              x-text="libraryQuery?'没有匹配的素材':'归档项目时可把图片收进素材库'"
+            ></p>
+            <a href="/projects?view=library">管理素材库</a>
+          </div></template
+        >
+      </aside>
+      <main :inert="!!panel||fullEditor||!projectReady||directorAdopting">
+        <section
+          class="canvas compact-canvas"
+          :class="{'director-framing':directorFraming&&!drag,'editing-node':composerExpanded&&composerTask}"
+          x-show="view==='canvas'&&(projectReady||projectPreview)"
+          x-ref="world"
+          @pointerdown.self="dragStart($event,null)"
+          @click.self="backgroundClick()"
+          @pointermove="connectionDraft?moveConnection($event):dragMove($event)"
+          @pointerup="connectionDraft?endConnection($event):dragEnd()"
+          @pointercancel="connectionDraft=null;dragEnd()"
+          @wheel="wheel($event)"
+        >
+          <div
+            class="creation-dock"
+            x-show="!compactViewport||!composerExpanded||!composerTask"
+            aria-label="添加创作内容"
+          >
+            <button
+              class="dock-add"
+              @click="addMenu=!addMenu"
+              :aria-expanded="addMenu"
+              aria-label="添加到画布"
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <use href="#ui-plus"></use>
+              </svg></button
+            ><button @click="$refs.import.click()" aria-label="添加图片素材">
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <use href="#ui-image"></use></svg
+              ><span>素材</span></button
+            ><button
+              @click="addImageGeneration()"
+              aria-label="添加图片生成节点"
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <use href="#ui-spark"></use></svg
+              ><span>生图</span></button
+            ><button @click="addShot()" aria-label="添加视频片段">
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <use href="#ui-video"></use></svg
+              ><span>视频</span></button
+            ><button @click="addNote()" aria-label="添加创意备注">
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <use href="#ui-note"></use></svg
+              ><span>备注</span></button
+            ><span class="dock-divider" aria-hidden="true"></span>
+            <div class="canvas-controls">
+              <button
+                :class="tool==='hand'?'active':''"
+                @click="tool='hand'"
+                aria-label="平移工具"
+              >
+                <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <use href="#ui-hand"></use>
+                </svg></button
+              ><button
+                :class="tool==='select'?'active':''"
+                @click="tool='select'"
+                aria-label="框选工具"
+              >
+                <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <use href="#ui-select"></use>
+                </svg></button
+              ><button
+                :disabled="!history.length"
+                @click="undo()"
+                aria-label="撤销画布修改"
+              >
+                <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <use href="#ui-undo"></use>
+                </svg></button
+              ><button @click="zoomAt(-.1)" aria-label="缩小画布">
+                <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <use href="#ui-minus"></use>
+                </svg></button
+              ><span x-text="Math.round(zoom*100)+'%'"></span
+              ><button @click="zoomAt(.1)" aria-label="放大画布">
+                <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <use href="#ui-plus"></use>
+                </svg></button
+              ><button
+                @click="organizeLayout()"
+                title="按备注、素材和镜头整理，可撤销"
+              >
+                整理</button
+              ><button @click="fit()" title="查看全部节点">全览</button>
+            </div>
+            <input
+              type="file"
+              x-ref="import"
+              accept="image/png,image/jpeg,image/webp"
+              hidden
+              @change="importImage($event)"
+            />
+            <div
+              class="add-popover"
+              x-show="addMenu"
+              x-cloak
+              @click.outside="addMenu=false"
+            >
+              <strong>添加节点</strong
+              ><button @click="$refs.import.click()">＋ 上传图片</button
+              ><button @click="addImageGeneration()">＋ 生成图片</button
+              ><button @click="addShot();addMenu=false">＋ 视频节点</button
+              ><button @click="addNote()">＋ 创意备注</button
+              ><button @click="addNarration()">＋ 口播稿</button>
+            </div>
+          </div>
+          <div
+            class="world"
+            :style="'--inverse-zoom:'+(1/zoom)+';transform:translate('+pan.x+'px,'+pan.y+'px) scale('+zoom+');--canvas-label-scale:'+Math.max(.65,Math.min(1,zoom))"
+            @pointerdown.self="dragStart($event,null)"
+            @click.self="backgroundClick()"
+          >
+            <div class="connections">
+              <svg class="edge-layer" width="10000" height="10000">
+                <path
+                  class="edge-preview"
+                  x-show="connectionDraft"
+                  :d="connectionPreview()"
+                ></path></svg
+              ><template x-for="edge in canvasEdges()" :key="edge.id"
+                ><svg class="edge-layer" width="10000" height="10000">
+                  <g
+                    :data-edge-id="edge.id"
+                    :class="{'edge-active':edgeActive(edge),'edge-result':edge.kind==='result'}"
+                  >
+                    <path
+                      class="edge-hit"
+                      :d="edge.path"
+                      @pointerdown.stop
+                      @click.stop="selectEdge(edge)"
+                    ></path>
+                    <path class="edge-path" :d="edge.path"></path>
+                    <path
+                      class="edge-flow"
+                      :d="edge.path"
+                      pathLength="100"
+                      aria-hidden="true"
+                    ></path>
+                  </g></svg
+              ></template>
+            </div>
+            <template x-for="(a,assetIndex) in assets" :key="a.id"
+              ><article
+                class="asset node enter"
+                :data-object-id="a.id"
+                :class="{'selected':selectedIds.includes(a.id),'pending':a.pending}"
+                :style="'left:'+a.x+'px;top:'+a.y+'px;width:'+a.w+'px'"
+                @pointerdown="dragStart($event,a.id)"
+                @click="if(!dragClick)choose(a.id)"
+              >
+                <button
+                  class="node-port port-out"
+                  :style="'top:'+(34+a.h/2-6)+'px'"
+                  @pointerdown.stop="startConnection($event,a.id)"
+                  @click.stop="if(!connectionDraft)connectionDraft={from:a.id,point:portPoint(a.id,'out')}"
+                  :aria-label="'连接图片：'+a.name"
+                  title="连接视频节点"
+                ></button>
+                <div class="node-label">
+                  <span class="node-type-label"
+                    ><svg
+                      class="ui-icon"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <use href="#ui-image"></use></svg
+                    ><span
+                      :title="a.name"
+                      x-text="studioAssetName(a,assetIndex)"
+                    ></span></span
+                  ><small>9:16</small
+                  ><button
+                    class="node-delete"
+                    @click.stop="removeNodes([a.id])"
+                    :aria-label="'删除节点：'+a.name"
+                  >
+                    ×
+                  </button>
+                </div>
+                <template x-if="!a.pending"
+                  ><button
+                    class="asset-image"
+                    :style="'height:'+a.h+'px'"
+                    @click="if(!dragClick)selectAsset(a.id,$event)"
+                    :aria-label="'选择'+a.name" @dblclick.stop="choose(a.id);openEdit()"
+                  >
+                    <img
+                      draggable="false"
+                      @dragstart.prevent
+                      :src="displayFile(a.file)"
+                      :alt="a.name"
+                    /></button></template
+                ><template x-if="a.pending"
+                  ><div class="pending-body" :style="'height:'+a.h+'px'">
+                    <template x-if="a.imageJob?.output"
+                      ><img
+                        class="generated-preview"
+                        :src="displayFile(a.imageJob.output)"
+                        :alt="a.name"
+                    /></template>
+                    <div x-show="!a.imageJob?.output">
+                      <span>◈</span>
+                      <p
+                        x-text="a.imageJob?projectStateLabel(a.imageJob.state):a.generationDraft?'描述想生成的画面':a.purpose"
+                      ></p>
+                    </div></div></template
+                ><button
+                  class="resize-handle"
+                  x-show="selectedIds.includes(a.id)&&!a.pending"
+                  @pointerdown.stop.prevent="resizeStart($event,a.id)"
+                  @pointermove.stop="dragMove($event)"
+                  @pointerup.stop="dragEnd()"
+                  :aria-label="'调整'+a.name+'尺寸'"
+                >
+                  <svg viewBox="0 0 16 16"><path d="m4 12 8-8M8 12l4-4" /></svg>
+                </button></article
+            ></template>
+            <template x-for="s in shots" :key="s.id">
+              <article
+                class="video-task media-task node"
+                :data-object-id="s.id"
+                :class="{'selected-node':selectedIds.includes(s.id)}"
+                :style="'left:'+s.x+'px;top:'+s.y+'px;width:'+mediaSize().w+'px'"
+                @pointerdown="dragStart($event,s.id)"
+                @click="if(!dragClick){active=s.id;choose(s.id);persist()}"
+              >
+                <button
+                  class="node-port port-in"
+                  :style="'top:'+(34+mediaSize().h/2-6)+'px'"
+                  @pointerdown.stop
+                  @click.stop="if(connectionDraft){const from=connectionDraft.from;connectionDraft=null;connectNodes(from,s.id)}else showInputConnection(s.id)"
+                  :aria-label="'输入端口：'+s.name"
+                  title="连接首帧或参考图"
+                ></button>
+                <span
+                  class="node-port port-out result-port"
+                  :style="'top:'+(34+mediaSize().h/2-6)+'px'"
+                ></span>
+                <div class="node-label">
+                  <span :title="'镜头设置 · '+s.name" x-text="s.name"></span
+                  ><small x-show="!latestShotJob(s)" x-text="'9:16 · 5s'"></small
+                  ><small
+                    class="node-task-state"
+                    x-show="latestShotJob(s)"
+                    :title="latestShotJob(s)?videoState(latestShotJob(s))+' · 9:16 · 5s':''"
+                    x-text="latestShotJob(s)?videoState(latestShotJob(s)).replace('生成完成 · ','').replace(/ · [\d.]+ 秒$/,''):''"
+                  ></small
+                  ><button
+                    class="node-delete"
+                    @click.stop="removeNodes([s.id])"
+                    :aria-label="'删除节点：'+s.name"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div class="task-media" :style="'height:'+mediaSize().h+'px'">
+                  <template x-if="shotPreview(s)"
+                    ><img draggable="false" :src="shotPreview(s)" :alt="s.name"
+                  /></template>
+                  <div class="empty-media" x-show="!shotPreview(s)">
+                    <span>▧</span>
+                    <button class="empty-frame-action" @pointerdown.stop @click.stop="openShotImagePicker(s.id)" :aria-label="'为'+s.name+'选择首帧'">选择首帧</button>
+                    <p>使用对话图片或画布素材</p>
+                  </div>
+                </div>
+              </article>
+            </template>
+            <template x-for="job in visibleVideoJobs" :key="job.id">
+              <article
+                class="real-video-node media-result node"
+                :data-video-job="job.id"
+                :data-object-id="'video-'+job.id"
+                :class="{'selected-node':selectedIds.includes('video-'+job.id)}"
+                @pointerdown="dragStart($event,'video-'+job.id)"
+                @click="if(!dragClick)choose('video-'+job.id)"
+                :style="'left:'+videoPosition(job).x+'px;top:'+videoPosition(job).y+'px;width:'+mediaSize().w+'px'"
+              >
+                <span
+                  class="node-port port-in video-result-port"
+                  :style="'top:'+(34+mediaSize().h/2-6)+'px'"
+                ></span>
+                <div class="node-label">
+                  <span :title="job.name" x-text="'视频结果 · '+job.name"></span
+                  ><small x-text="videoAdopted(job)?'已采用':'5s'"></small
+                  ><button
+                    class="node-delete"
+                    @click.stop="removeNodes(['video-'+job.id])"
+                    :aria-label="'收起结果：'+job.name"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div class="task-media" :style="'height:'+mediaSize().h+'px'">
+                  <video
+                    x-show="job.media"
+                    :src="job.media"
+                    :poster="displayFile(job.image)"
+                    controls
+                    playsinline
+                    preload="metadata"
+                  ></video>
+                  <div class="empty-media" x-show="!job.media">
+                    <span>▷</span>
+                    <p x-text="job.error||videoState(job)"></p>
+                  </div>
+                </div>
+              </article>
+            </template>
+            <template x-for="n in notes" :key="n.id"
+              ><article
+                class="plan-node node enter"
+                :data-object-id="n.id"
+                :class="selectedIds.includes(n.id)?'selected-node':''"
+                :style="'left:'+n.x+'px;top:'+n.y+'px;width:'+n.w+'px'"
+                @pointerdown="dragStart($event,n.id)"
+              >
+                <button
+                  class="node-port port-out"
+                  @pointerdown.stop="startConnection($event,n.id)"
+                  @click.stop="if(!connectionDraft)connectionDraft={from:n.id,point:portPoint(n.id,'out')}"
+                  :aria-label="'连接创意：'+n.title"
+                  title="拖到片段输入，作为创意依据"
+                ></button>
+                <div class="node-label">
+                  <span>创意备注</span><button
+                    class="node-delete"
+                    @click.stop="removeNodes([n.id])"
+                    :aria-label="'删除节点：'+n.title"
+                    title="删除节点，可撤销"
+                  >
+                    ×
+                  </button>
+                </div>
+                <button
+                  class="plan-content"
+                  @click="if(!dragClick){choose(n.id);editedNote=n.id;panel='note'}"
+                >
+                  <h3 x-text="n.title"></h3>
+                  <p
+                    x-text="studioNotePreview(n.text)||'写下创意，或从对话添加方案。'"
+                  ></p>
+                  <small
+                    x-text="n.source?.type==='chat'?'来自项目对话':n.source?'来自项目对话':'画布中的创意'"
+                  ></small>
+                </button></article
+            ></template>
+            <div
+              class="marquee"
+              x-show="marquee"
+              x-cloak
+              :style="marquee?'left:'+marquee.x+'px;top:'+marquee.y+'px;width:'+marquee.w+'px;height:'+marquee.h+'px':''"
+            ></div>
+            <template x-if="!narrationNode.removed"
+              ><article
+                class="narration-node node"
+                data-object-id="narration"
+                :style="'left:'+narrationNode.x+'px;top:'+narrationNode.y+'px;width:300px'"
+                @pointerdown="dragStart($event,'narration')"
+              >
+                <div class="row spread">
+                  <span class="eyebrow">成片口播</span
+                  ><button
+                    class="node-delete"
+                    @click.prevent.stop="removeNarration()"
+                    aria-label="删除节点：口播稿"
+                  >
+                    ×
+                  </button>
+                </div>
+                <button class="narration-open" @click="panel='script'">
+                  <span x-text="voice?'编辑口播稿':'添加口播'"></span
+                  ><span> ↗</span>
+                </button>
+              </article></template
+            >
+          </div>
+          <div
+            class="selection-toolbar context-toolbar"
+            x-ref="contextToolbar"
+            :style="floatingStyle('toolbar')"
+            x-show="showContextToolbar&&!assistant"
+            x-cloak
+            @pointerdown.stop
+          >
+            <template
+              x-if="selectedIds.length===1&&composerAsset&&!composerAsset.pending"
+              ><div class="selection-actions">
+                <button @click="startImageEdit()">
+                  <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <use href="#ui-repair"></use></svg
+                  ><span>修图</span></button
+                ><button @click="openEdit()">
+                  <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <use href="#ui-edit"></use></svg
+                  ><span>精细编辑</span></button
+                ><button @click="makeVideoFromImage()">
+                  <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <use href="#ui-video"></use></svg
+                  ><span>生成视频</span></button
+                ><button x-ref="selectionMoreTrigger" @click="selectionMore=!selectionMore" @keydown.down.prevent="selectionMore=true;$nextTick(()=>focusSelectionAction())" :aria-expanded="selectionMore" aria-label="更多素材操作">更多</button>
+                <div class="composer-more" x-ref="selectionMore" :style="selectionMoreStyle" x-show="selectionMore" x-transition.opacity.duration.120ms @keydown.down.prevent="focusSelectionAction(1)" @keydown.up.prevent="focusSelectionAction(-1)" @click.outside="selectionMore=false" role="menu" aria-label="素材操作">
+                  <button role="menuitem" @click="selectionMore=false;collectToLibrary(composerAsset)" :disabled="libraryBusy">收进素材库</button>
+                  <a role="menuitem" :href="displayFile(composerAsset.file)" download>下载图片</a>
+                  <a role="menuitem" x-show="selectionSourceHref" :href="selectionSourceHref||'#'" @click="selectionMore=false;openSelectionSource($event)">查看来源对话 ↗</a>
+                  <button role="menuitem" @click="selectionMore=false;openSelectionVersions()">查看版本记录</button>
+                  <button role="menuitem" class="composer-remove" @click="selectionMore=false;removeNodes()">删除节点</button>
+                </div>
+              </div></template
+            >
+            <template x-if="selectedIds.length===1&&composerShot"
+              ><div class="selection-actions">
+                <button @click="openClip(composerShot.id)">编辑镜头</button
+                ><button @click="openDirectorSelection()">
+                  <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <use href="#ui-director"></use></svg
+                  ><span>导演讨论</span></button
+                ><button
+                  x-show="selection.startsWith('video-')||latestShotJob(composerShot)?.state==='succeeded'"
+                  @click="reviewVideoId=selection.startsWith('video-')?selection.slice(6):latestShotJob(composerShot).id;panel='video-review'"
+                >
+                  核对与采用</button
+                ><button @click="modelMenu=false;choose(composerShot.id)">
+                  ↻ 再次生成
+                </button>
+              </div></template
+            >
+            <template
+              x-if="selectedIds.length===1&&notes.some(n=>n.id===selection)"
+              ><div class="selection-actions">
+                <button @click="editedNote=selection;panel='note'">
+                  编辑备注</button
+                ><button @click="noteToShot()">建立视频节点</button>
+              </div></template
+            >
+            <button
+              class="delete-selected"
+              x-show="selectedIds.length>1||(!composerAsset&&!composerTask)"
+              @click="removeNodes()"
+              aria-label="删除选中节点"
+              title="删除选中节点"
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <use href="#ui-trash"></use>
+              </svg>
+            </button>
+          </div>
+          <div
+            class="node-composer"
+            :class="{'menu-open':modelMenu,'is-expanded':composerExpanded,'advice-open':promptAdvice}"
+            x-ref="composer"
+            :style="floatingStyle('composer')"
+            x-show="composerTask&&selectedIds.length===1&&!assistant"
+            x-cloak
+            @pointerdown.stop
+            @wheel.stop
+          >
+            <div class="composer-top">
+              <div class="composer-heading">
+                <strong
+                  :title="composerObject?.name"
+                  x-text="inspectorTitle"
+                ></strong
+                ><span
+                  x-show="composerTask==='video'&&selection.startsWith('video-')"
+                  >重新生成</span
+                >
+              </div>
+              <div class="composer-actions">
+                <button
+                  class="composer-toggle"
+                  @click="toggleComposer()"
+                  :aria-expanded="composerExpanded"
+                  x-text="composerExpanded?'收起':'编辑'"
+                  aria-label="展开或收起生成设置"
+                ></button
+                ><button
+                  class="composer-more-trigger"
+                  x-ref="composerMoreTrigger"
+                  @click="toggleComposerMore()"
+                  @keydown.down.prevent="composerMore=true;$nextTick(()=>focusComposerAction())"
+                  :aria-expanded="composerMore"
+                  aria-label="更多节点操作"
+                >
+                  更多</button
+                ><button
+                  class="composer-dismiss"
+                  @click="clearCanvasSelection()"
+                  aria-label="取消节点选中"
+                >×</button>
+              </div>
+              <div
+                class="composer-more"
+                x-ref="composerMore"
+                :style="composerMoreStyle"
+                @keydown.down.prevent="focusComposerAction(1)"
+                @keydown.up.prevent="focusComposerAction(-1)"
+                x-show="composerMore"
+                @click.outside="composerMore=false"
+                x-transition.opacity.duration.120ms
+                role="menu"
+                aria-label="节点操作"
+              >
+                <button
+                  role="menuitem"
+                  x-show="composerTask==='video'&&(selection.startsWith('video-')||latestShotJob(composerShot)?.state==='succeeded')"
+                  @click="composerMore=false;reviewVideoId=selection.startsWith('video-')?selection.slice(6):latestShotJob(composerShot).id;panel='video-review'"
+                >
+                  核对与采用视频
+                </button>
+                <button
+                  role="menuitem"
+                  x-show="composerTask==='video'"
+                  @click="composerMore=false;openDirectorSelection()"
+                >
+                  与导演讨论
+                </button>
+                <button
+                  role="menuitem"
+                  x-show="composerTask==='edit'"
+                  @click="composerMore=false;makeVideoFromImage()"
+                >
+                  用图片生成视频
+                </button>
+                <a
+                  role="menuitem"
+                  x-show="composerTask==='edit'"
+                  :href="displayFile(composerAsset?.file)"
+                  download
+                  >下载图片</a
+                >
+                <button
+                  role="menuitem"
+                  x-show="composerTask!=='generate'"
+                  @click="composerMore=false;composerTask==='video'?openClip(composerShot.id):openEdit()"
+                >
+                  完整编辑
+                </button>
+                <a role="menuitem" x-show="selectionSourceHref" :href="selectionSourceHref||'#'" @click="composerMore=false;openSelectionSource($event)">查看来源对话 ↗</a>
+                <button role="menuitem" x-show="inspectorObject" @click="composerMore=false;openSelectionVersions()">查看版本记录</button>
+                <button role="menuitem" x-show="composerShot&&videoSequence.some(s=>s.video?.shot===composerShot?.id)" @click="composerMore=false;openAssemblyForShot(composerShot.id)">在剪辑中查看 ↗</button>
+                <button
+                  role="menuitem"
+                  class="composer-remove"
+                  @click="composerMore=false;removeNodes()"
+                >
+                  删除节点
+                </button>
+              </div>
+            </div>
+            <button
+              class="composer-summary"
+              x-show="!composerExpanded"
+              @click="toggleComposer()"
+              aria-label="编辑生成提示词"
+            >
+              <span x-text="composerSummary||'写下画面与动作，开始创作'"></span
+              ><small
+                ><span x-text="selectedModel().label||'读取模型…'"></span
+                ><span x-text="composerEstimate()"></span
+              ></small>
+            </button>
+            <div
+              class="composer-edit-body"
+              x-show="composerExpanded"
+              x-transition:enter="composer-reveal"
+              x-transition:enter-start="composer-reveal-start"
+              x-transition:enter-end="composer-reveal-end"
+            >
+              <div
+                class="composer-references"
+                x-show="composerTask!=='generate'"
+              >
+                <div
+                  class="composer-modes"
+                  x-show="composerTask==='video'"
+                  aria-label="图片输入方式"
+                >
+                  <button
+                    :class="composerShot?.mode==='first'?'on':''"
+                    @click="setInputMode('first')"
+                  >
+                    首帧</button
+                  ><button
+                    :class="composerShot?.mode==='reference'?'on':''"
+                    @click="setInputMode('reference')"
+                  >
+                    参考图
+                  </button>
+                </div>
+                <button
+                  class="reference-add"
+                  x-ref="referenceTrigger"
+                  x-show="composerTask==='video'"
+                  @click="toggleReferencePicker()"
+                  :aria-expanded="referenceMenu"
+                >
+                  <span x-text="composerShot?.mode==='first'?(composerShot.first?'更换首帧':'选择首帧'):'＋ 参考图'"></span>
+                </button>
+                <template x-for="(a,index) in composerRefs()" :key="a.id"
+                  ><button
+                    class="reference-thumb"
+                    :title="a.name"
+                    :aria-label="a.name"
+                    @click="choose(a.id);focusObject(a.id);$nextTick(()=>revealComposerTarget())"
+                  >
+                    <img :src="displayFile(a.file)" :alt="a.name" /><b
+                      x-text="index+1"
+                    ></b></button
+                ></template>
+                <div
+                  class="reference-picker"
+                  :style="referenceMenuStyle"
+                  x-show="referenceMenu"
+                  @click.outside="referenceMenu=false"
+                >
+                  <template
+                    x-for="a in assets.filter(a=>!a.pending)"
+                    :key="a.id"
+                    ><button @click="addReference(a.id)" :disabled="referenceBusy">
+                      <img :src="displayFile(a.file)" :alt="a.name" /><span
+                        x-text="a.name"
+                      ></span></button
+                  ></template>
+                  <p class="reference-picker-heading" x-show="availableChatMaterials.length">本对话的图片</p>
+                  <template x-for="image in availableChatMaterials" :key="image.id"><button @click="useChatMaterial(image)" :disabled="referenceBusy"><img :src="displayFile(image.file)" :alt="image.name"/><span x-text="image.name" :title="image.name"></span></button></template>
+                  <p x-show="referenceLoading">正在读取对话素材…</p>
+                  <p x-show="referenceBusy">正在带入图片…</p>
+                  <p x-show="!referenceLoading&&!availableChatMaterials.length&&!assets.some(a=>!a.pending)">还没有图片，请添加素材</p>
+                  <button class="reference-upload" @click="referenceMenu=false;$refs.import.click()" :disabled="referenceBusy">＋ 上传新图片</button>
+                </div>
+              </div>
+              <div class="composer-prompt-heading">
+                <label
+                  x-text="composerTask==='video'?'镜头提示词':composerTask==='generate'?'画面描述':'修改要求'"
+                ></label
+                ><button
+                  class="prompt-optimize"
+                  :disabled="directorStatus==='saving'||composerBusy()"
+                  @click="promptAdvice?closeDirector():openDirectorSelection(composerTask==='video'?'optimize':composerTask==='generate'?'optimize-generate':'optimize-edit')"
+                  x-text="directorStatus==='saving'?'正在打开…':promptAdvice?'返回编辑':'优化提示词'"
+                ></button>
+              </div>
+              <template x-if="composerTask==='video'">
+                <textarea
+                  class="composer-prompt"
+                  x-show="!promptAdvice"
+                  aria-label="视频生成提示词"
+                  x-model="composerShot.prompt"
+                  @input="composerShot.dirty=true;persist()"
+                  placeholder="描述画面、动作和镜头运动…"
+                ></textarea>
+              </template>
+              <template x-if="composerTask==='generate'||composerTask==='edit'">
+                <textarea
+                  class="composer-prompt"
+                  x-show="!promptAdvice"
+                  :aria-label="composerTask==='generate'?'图片生成提示词':'图片编辑提示词'"
+                  x-model="composerAsset.imagePrompt"
+                  @input="if(composerTask==='edit')composerAsset.imageEditPrompt=composerAsset.imagePrompt;persist()"
+                  :placeholder="composerTask==='generate'?'描述你想生成的画面…':'描述要修改的部分，以及需要保留的外观…'"
+                ></textarea>
+              </template>
+              <div x-ref="promptAdvice" class="composer-advice-slot" x-show="promptAdvice" aria-label="节点提示词优化"></div>
+              <p
+                class="reference-warning"
+                x-show="referenceWarning"
+                x-text="referenceWarning"
+                role="status"
+              ></p>
+              <div class="composer-bottom" x-show="!promptAdvice">
+                <div class="model-control">
+                  <button
+                    class="model-trigger"
+                    x-ref="modelTrigger"
+                    @click="modelMenu=!modelMenu"
+                    :aria-expanded="modelMenu"
+                    aria-label="选择下次生成模型"
+                  >
+                    <span class="model-label" x-text="selectedModel().label||'读取模型…'"></span
+                    ><span>⌄</span>
+                  </button>
+                  <div
+                    class="model-menu"
+                    :style="modelMenuStyle"
+                    x-show="modelMenu"
+                    x-cloak
+                    @click.outside="modelMenu=false"
+                    role="menu"
+                    aria-label="任务模型列表"
+                  >
+                    <div
+                      class="model-menu-heading"
+                      x-text="composerTask==='video'?'视频模型':composerTask==='edit'?'修图模型':'图片模型'"
+                    ></div>
+                    <p
+                      class="model-empty"
+                      x-show="!modelsFor(composerTask).length"
+                    >
+                      <span
+                        x-text="modelListBusy?'正在读取模型…':modelListError||'模型列表暂未读取'"
+                      ></span
+                      ><button @click="loadModels()" :disabled="modelListBusy">
+                        重试读取
+                      </button>
+                    </p>
+                    <template
+                      x-for="m in modelsFor(composerTask)"
+                      :key="m.provider+':'+m.model"
+                      ><button
+                        role="menuitemradio"
+                        :aria-checked="selectedModel().model===m.model"
+                        :disabled="!m.configured"
+                        :class="selectedModel().model===m.model?'chosen':''"
+                        @click="setModel(m)"
+                        :data-model="m.model"
+                      >
+                        <span class="model-description"
+                          ><strong x-text="m.label"></strong
+                          ><small x-text="m.detail"></small></span
+                        ><span
+                          class="model-mark"
+                          x-text="!m.configured?'未配置':selectedModel().model===m.model?'✓':''"
+                        ></span></button
+                    ></template>
+                  </div>
+                </div>
+                <span
+                  class="composer-params"
+                  x-text="composerTask==='video'?'9:16 · '+(selectedModel().resolution||'')+' · 5s':'9:16 · 1张'"
+                ></span>
+                <button
+                  class="composer-submit"
+                  @click="submitComposer()"
+                  :disabled="composerBusy()||!selectedModel().configured||!!referenceWarning"
+                  :aria-label="composerTask==='video'?'生成视频':composerTask==='generate'?'生成图片':'执行修图'"
+                  :aria-busy="composerBusy()"
+                >
+                  <span
+                    x-show="composerBusy()"
+                    class="composer-spinner"
+                    aria-hidden="true"
+                  ></span
+                  ><span
+                    x-show="!composerBusy()"
+                    x-text="composerTask==='video'?'生成视频':composerTask==='generate'?'生成图片':'执行修图'"
+                  ></span
+                  ><span
+                    class="visually-hidden"
+                    x-show="composerBusy()"
+                    x-text="composerProgress()"
+                  ></span>
+                </button>
+              </div>
+              <p
+                class="composer-cost"
+                x-show="!promptAdvice"
+                x-text="composerEstimate()"
+                title="按模型标价与生成用量估算，实际金额以供应商账单为准"
+              ></p>
+            </div>
+            <div
+              class="composer-feedback"
+              x-show="composerError||composerImageJob||composerBusy()"
+            >
+              <p
+                role="status"
+                x-text="composerError||composerImageJob?.error||composerProgress()"
+              ></p>
+              <button
+                x-show="composerImageJob?.state==='succeeded'"
+                :data-result="composerImageJob?.output"
+                :data-task="composerTask"
+                @click="adoptComposerImage()"
+                x-text="composerTask==='generate'?'采用图片':'对比与采用'"
+              ></button>
+            </div>
+          </div>
+          <div class="edge-toolbar" x-show="selectedEdge" x-cloak>
+            <span x-text="selectedEdge?.editable?'所选连接':'生成来源'"></span
+            ><button x-show="selectedEdge?.editable" @click="disconnectEdge()">
+              断开连接</button
+            ><button @click="selectedEdge=null">关闭</button>
+          </div>
+          <div class="connection-hint" x-show="connectionDraft" x-cloak>
+            拖到视频片段左侧端口 · Esc 取消
+          </div>
+        </section>
+        <section class="assembly" x-show="view==='assemble'" x-cloak>
+          <div class="assembly-grid">
+            <section class="preview-workspace">
+              <div class="preview-caption">
+                <span x-text="assemblyClip?'片段预览':currentRender?'成片预览':'片段预览'"></span>
+                <button x-show="currentRender&&assemblyClip" @click="assemblyClip=''">成片预览</button>
+                <span>9:16</span>
+              </div>
+              <div class="film-screen">
+                <template x-if="assemblyPreview"
+                  ><video
+                    :key="assemblyPreview"
+                    :src="assemblyPreview"
+                    controls
+                    playsinline
+                    preload="metadata"
+                    aria-label="剪辑预览"
+                  ></video
+                ></template>
+                <div class="preview-empty" x-show="!assemblyPreview">
+                  <span>▷</span>
+                  <p>采用视频后在这里预览</p>
+                  <button @click="view='canvas'">选择片段</button>
+                </div>
+              </div>
+              <div class="preview-meta">
+                <span
+                  x-text="assemblyClip?'片段 · '+(assemblySelection?.output_duration||5)+'s':currentRender?'MP4 · H.264 · '+currentRender.duration+'s':''"
+                ></span
+                ><span
+                  x-show="videoRenders.some(r=>r.state==='running')"
+                  role="status"
+                  >正在合成…</span
+                >
+              </div>
+            </section>
+            <aside>
+              <h3>导出设置</h3>
+              <dl>
+                <dt>画幅</dt>
+                <dd>9:16</dd>
+                <dt>分辨率</dt>
+                <dd>720 × 1280</dd>
+                <dt>格式</dt>
+                <dd>MP4 / H.264</dd>
+                <dt>时长</dt>
+                <dd x-text="adoptedSeconds+' 秒'"></dd>
+              </dl>
+              <div class="export-duration">
+                <span
+                  x-text="'已采用 '+videoSequence.length+' 段 · '+adoptedSeconds+' / '+targetSeconds+' 秒'"
+                ></span
+                ><button @click="view='canvas'">选择片段 ↗</button>
+              </div>
+              <button
+                class="primary full"
+                x-text="videoBusy?'处理中…':currentRender?'重新合成':'合成视频'"
+                @click="renderVideo()"
+                :disabled="videoBusy||!adoptedSeconds||videoRenders.some(r=>r.state==='running')"
+              >
+                合成视频</button
+              ><a
+                class="download-film primary"
+                x-show="currentRender"
+                :href="currentRender?.media+'?download=1'"
+                download
+                >下载 MP4 ↓</a
+              >
+              <p class="subtle">本地合成 · 原视频保留</p>
+              <button class="outline full" @click="exportPlan()">
+                导出项目 JSON
+              </button>
+              <p role="alert" x-show="videoError" x-text="videoError"></p>
+              <template
+                x-for="r in videoRenders.filter(r=>r.state==='failed')"
+                :key="r.id"
+                ><p x-text="r.error"></p
+              ></template>
+            </aside>
+          </div>
+          <section class="timeline">
+            <div class="timeline-heading">
+              <h3>视频轨道</h3>
+              <button x-show="videoSequence.length" @click="locateAssemblyClip()">定位画布镜头 ↗</button>
+              <span x-text="adoptedSeconds+'s / '+targetSeconds+'s'"></span>
+            </div>
+            <div class="real-timeline">
+              <template x-for="(s,index) in videoSequence" :key="s.job"
+                ><button
+                  :class="{'active':assemblyClip===s.job||!assemblyClip&&index===0}"
+                  @click="selectAssemblyClip(s.job)"
+                  :aria-label="'预览片段：'+(s.video?.name||'已采用片段')"
+                >
+                  <img :src="displayFile(s.video?.image)" alt="" /><span
+                    ><strong x-text="s.video?.name||'已采用片段'"></strong
+                    ><small
+                      x-text="(s.video?.output_duration||5)+'s'"
+                    ></small></span
+                  ><i x-text="String(index+1).padStart(2,'0')"></i></button
+              ></template>
+              <p x-show="!videoSequence.length">还没有采用的片段</p>
+            </div>
+          </section>
+        </section>
+      </main>
+      <aside
+        class="assistant live-director"
+        :class="{'inline-prompt-advice':promptAdvice}"
+        :style="promptAdvice?promptAdviceStyle:{}"
+        x-show="assistant||promptAdvice"
+        x-cloak
+        :inert="!!panel||fullEditor||projectLoading||productionLoading"
+      >
+        <div class="director-shell-heading">
+          <h3 x-text="promptAdvice?'优化提示词':'项目对话'">项目对话</h3>
+          <a
+            x-show="!promptAdvice"
+            @click="openFullChat($event)"
+            :href="studioChatHref(sharedChatId,workspaceId,quote?.targetId||active||'')"
+            :aria-busy="chatOpening"
+            ><span x-text="chatOpening?'打开中…':'完整对话'">完整对话</span
+            ><svg
+              x-show="!chatOpening"
+              class="ui-icon"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <use href="#ui-external"></use></svg></a
+          ><span
+            role="status"
+            x-show="directorStatus!=='confirmed'"
+            x-text="directorStatus==='pending'?'待切换':directorStatus==='error'?'同步失败':'同步中…'"
+          ></span
+          >
+          <button @click="closeDirector()" :aria-label="promptAdvice?'关闭提示词优化':'关闭助手'">×</button>
+        </div>
+        <template x-if="directorFrameUrl&&projectReady"
+          ><iframe
+            x-ref="director"
+            :src="directorUrl"
+            title="真实导演项目对话"
+            @load="syncDirectorTarget()"
+          ></iframe
+        ></template>
+      </aside>
+      <div
+        class="shade"
+        x-show="panel"
+        x-cloak
+        @click.self="panel=''"
+        @keydown.escape.window="panel=''"
+        x-transition.opacity
+      >
+        <section
+          class="modal"
+          :class="{'project-modal':panel==='project','clip-modal':panel==='clip'}"
+          role="dialog"
+          aria-modal="true"
+          aria-label="视频创作编辑"
+        >
+          <button class="close" @click="panel=''" aria-label="关闭编辑">
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <use href="#ui-close"></use>
+            </svg>
+          </button>
+          <div x-show="panel==='project'" class="project-progress">
+            <div class="project-heading">
+              <div class="project-heading-meta">
+                <span>项目资料</span>
+                <div
+                  class="project-save-state"
+                  :class="{'has-error':projectError}"
+                  role="status"
+                >
+                  <span x-text="projectStatus"></span
+                  ><button
+                    x-show="projectError"
+                    @click="flushProject().catch(()=>{})"
+                  >
+                    重试保存
+                  </button>
+                </div>
+              </div>
+              <h2 x-text="projectName"></h2>
+            </div>
+            <nav class="project-tabs" aria-label="项目资料分类">
+              <button
+                :class="projectTab==='overview'?'active':''"
+                @click="setProjectTab('overview')"
+              >
+                项目概览</button
+              ><button
+                :class="projectTab==='audit'?'active':''"
+                @click="setProjectTab('audit')"
+              >
+                模型与费用 <span x-text="audit.entries.length"></span></button
+              ><button
+                :class="projectTab==='versions'?'active':''"
+                @click="setProjectTab('versions')"
+              >
+                版本
+              </button>
+            </nav>
+            <div
+              class="project-scroll"
+              :class="projectTab==='versions'?'versions-open':''"
+            >
+              <div
+                class="project-recovery"
+                x-show="projectError||projectConflict"
+              >
+                <p
+                  class="project-error"
+                  x-show="projectError"
+                  x-text="projectError"
+                  role="alert"
+                ></p>
+                <button
+                  class="outline"
+                  x-show="projectConflict"
+                  @click="preserveAndReadLatest()"
+                >
+                  备份并读取更新</button
+                ><button
+                  class="outline"
+                  x-show="projectBackupAvailable"
+                  @click="downloadProjectBackup()"
+                >
+                  下载编辑备份
+                </button>
+              </div>
+              <div x-show="projectTab==='overview'" class="project-overview">
+                <div class="project-summary">
+                  <div>
+                    <span>素材</span
+                    ><strong
+                      x-text="assets.filter(a=>!a.pending).length+' 张'"
+                    ></strong>
+                  </div>
+                  <div>
+                    <span>镜头</span
+                    ><strong x-text="shots.length+' 段'"></strong>
+                  </div>
+                  <div>
+                    <span>已采用</span
+                    ><strong
+                      x-text="adoptedSeconds+' / '+targetSeconds+' 秒'"
+                    ></strong>
+                  </div>
+                  <div>
+                    <span>成片</span
+                    ><strong x-text="currentRender?'可下载':'未合成'"></strong>
+                  </div>
+                </div>
+                <div class="project-overview-grid">
+                  <div class="project-content">
+                    <label class="project-facts"
+                      ><span>共同要求</span
+                      ><textarea
+                        x-ref="projectFacts"
+                        x-model="facts"
+                        x-effect="facts;panel;compactViewport;$nextTick(()=>sizeProjectFacts())"
+                        maxlength="1000"
+                        @input="sizeProjectFacts()"
+                        @input.debounce.400ms="persist()"
+                        aria-label="项目共同要求"
+                        placeholder="产品事实、包装要求与创作边界"
+                      ></textarea>
+                    </label>
+                    <section class="project-section project-shots">
+                      <h3>镜头 <span x-text="shots.length"></span></h3>
+                      <template x-for="s in shots" :key="s.id"
+                        ><button
+                          class="project-object"
+                          @click="panel='';active=s.id;choose(s.id);focusObject(s.id)"
+                        >
+                          <img :src="shotPoster(s)" alt="" /><strong
+                            x-text="s.name"
+                          ></strong
+                          ><span
+                            x-text="!(s.mode==='first'?s.first:s.refs.length)?'待选画面':!s.prompt.trim()?'待写要求':latestShotJob(s)?videoState(latestShotJob(s)):'待生成'"
+                          ></span
+                          ><span class="project-row-arrow"
+                            ><svg
+                              class="ui-icon"
+                              viewBox="0 0 24 24"
+                              aria-hidden="true"
+                            >
+                              <use href="#ui-chevron"></use></svg
+                          ></span></button
+                      ></template>
+                      <p class="project-empty" x-show="!shots.length">
+                        还没有镜头
+                      </p>
+                    </section>
+                  </div>
+                  <aside
+                    class="project-settings"
+                    aria-label="生成设置与项目记录"
+                  >
+                    <section
+                      class="studio-budget"
+                      aria-labelledby="studio-budget-title"
+                    >
+                      <h3 id="studio-budget-title">图片生成次数</h3>
+                      <div class="budget-availability">
+                        <strong
+                          x-text="Math.max(0,cloudBudget.limit-cloudBudget.reserved)"
+                        ></strong
+                        ><span>次可用</span
+                        ><small
+                          x-text="'已预留 '+cloudBudget.reserved+' / '+cloudBudget.limit+' 次'"
+                        ></small>
+                      </div>
+                      <label class="budget-label" for="studio-budget-limit"
+                        >项目总上限</label
+                      >
+                      <div class="studio-budget-control">
+                        <div class="budget-input">
+                          <input
+                            id="studio-budget-limit"
+                            type="number"
+                            min="0"
+                            :max="cloudBudgetMaximum"
+                            step="1"
+                            x-model.number="cloudCalls"
+                            :disabled="cloudBudgetSaving"
+                            @input="cloudBudgetError='';cloudBudgetMessage=''"
+                            aria-describedby="studio-budget-help"
+                          /><span>次</span>
+                        </div>
+                        <button
+                          @click="saveCloudBudget()"
+                          :disabled="cloudBudgetSaving"
+                          x-text="cloudBudgetSaving?'保存中…':'保存上限'"
+                        ></button>
+                      </div>
+                      <p
+                        id="studio-budget-help"
+                        x-text="cloudBudget.max_calls===undefined?cloudBudgetHelp:'可设 0–'+cloudBudgetMaximum+' 次。失败或未知任务仍计入次数。'"
+                      ></p>
+                      <p
+                        class="budget-feedback"
+                        role="status"
+                        x-show="cloudBudgetMessage"
+                        x-text="cloudBudgetMessage"
+                      ></p>
+                      <p
+                        class="budget-error"
+                        role="alert"
+                        x-show="cloudBudgetError"
+                        x-text="cloudBudgetError"
+                      ></p>
+                    </section>
+                    <section class="project-section project-activity">
+                      <h3>最近变更</h3>
+                      <template
+                        x-for="event in projectEvents.slice(-4).reverse()"
+                        :key="event.id"
+                        ><div class="project-event">
+                          <span x-text="event.label"></span
+                          ><time
+                            x-text="new Date(event.at*1000).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})"
+                          ></time></div
+                      ></template>
+                      <p class="project-empty" x-show="!projectEvents.length">
+                        暂无变更记录
+                      </p>
+                    </section>
+                    <details
+                      class="project-backup"
+                      x-show="projectBackupAvailable"
+                    >
+                      <summary>
+                        <span>编辑备份</span
+                        ><svg
+                          class="ui-icon"
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                        >
+                          <use href="#ui-chevron"></use>
+                        </svg>
+                      </summary>
+                      <time
+                        x-text="projectBackupTime?new Date(projectBackupTime).toLocaleString('zh-CN'):''"
+                      ></time>
+                      <p>保存冲突前保留的编辑。</p>
+                      <button class="outline" @click="downloadProjectBackup()">
+                        下载备份
+                      </button>
+                    </details>
+                  </aside>
+                </div>
+              </div>
+              <div x-show="projectTab==='versions'" class="version-browser">
+                <aside class="version-targets">
+                  <nav aria-label="版本分类">
+                    <template
+                      x-for="category in versionCategories"
+                      :key="category.id"
+                      ><button
+                        :class="versionCategory===category.id?'active':''"
+                        @click="selectVersionCategory(category.id)"
+                        :aria-pressed="versionCategory===category.id"
+                      >
+                        <span x-text="category.name"></span></button
+                    ></template>
+                  </nav>
+                </aside>
+                <section class="version-history">
+                  <header>
+                    <div>
+                      <h3
+                        x-text="versionTarget?versionTargets.find(t=>t.id===versionTarget)?.name:versionCategories.find(c=>c.id===versionCategory)?.name+'版本'"
+                      ></h3>
+                      <p>恢复保留其他版本，不会重新生成视频。</p>
+                    </div>
+                    <button
+                      class="outline"
+                      @click="loadContentVersions()"
+                      :disabled="versionsBusy"
+                      aria-label="刷新版本"
+                    >
+                      <svg
+                        class="ui-icon"
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                      >
+                        <use href="#ui-undo"></use>
+                      </svg>
+                    </button>
+                  </header>
+                  <label class="version-search"
+                    ><input
+                      x-model="versionQuery"
+                      aria-label="搜索版本内容"
+                      placeholder="查找内容名称，点击下方查看"
+                  /></label>
+                  <div class="version-target-chips">
+                    <button
+                      :class="!versionTarget?'active':''"
+                      @click="versionTarget='';loadContentVersions()"
+                    >
+                      全部</button
+                    ><template
+                      x-for="target in categoryVersionTargets"
+                      :key="target.id"
+                      ><button
+                        :class="versionTarget===target.id?'active':''"
+                        @click="versionTarget=target.id;loadContentVersions()"
+                        :title="target.name"
+                      >
+                        <span x-text="target.name"></span></button
+                    ></template>
+                    <p x-show="versionQuery&&!categoryVersionTargets.length">
+                      没有匹配的内容
+                    </p>
+                  </div>
+                  <p class="subtle" x-show="versionsBusy" role="status">
+                    正在更新版本…
+                  </p>
+                  <p class="project-error" x-show="versionsError" role="alert">
+                    <span x-text="versionsError"></span
+                    ><button @click="loadContentVersions()">重试读取</button>
+                  </p>
+                  <template x-for="v in visibleContentVersions" :key="v.id"
+                    ><article class="content-version-row">
+                      <div class="version-preview">
+                        <template x-if="v.kind==='image'"
+                          ><img
+                            :src="displayFile(v.data.file)"
+                            alt="版本缩略图"
+                            loading="lazy" /></template
+                        ><svg
+                          x-show="v.kind!=='image'"
+                          class="ui-icon"
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                        >
+                          <use href="#ui-note"></use>
+                        </svg>
+                      </div>
+                      <div class="version-copy">
+                        <div class="version-row-title">
+                          <strong x-text="versionLabel(v)"></strong>
+                        </div>
+                        <small
+                          x-text="versionKind(v.kind,v.target)+(versionKind(v.kind,v.target)===v.label?'':' · '+v.label)+' · '+new Date(v.time*1000).toLocaleString('zh-CN')"
+                        ></small>
+                        <details
+                          x-show="!!v.data.text"
+                          @toggle="loadVersionDetail(v,$el.open)"
+                        >
+                          <summary x-text="v.data.text?.slice(0,100)"></summary>
+                          <p
+                            x-text="versionDetails[v.id]?.busy?'正在读取全文…':versionDetails[v.id]?.error||versionDetails[v.id]?.text||v.data.text"
+                          ></p>
+                          <button
+                            x-show="versionDetails[v.id]?.error"
+                            @click="loadVersionDetail(v,true)"
+                          >
+                            重试全文
+                          </button>
+                        </details>
+                      </div>
+                      <button
+                        class="outline"
+                        @click="restoreContentVersion(v)"
+                        :disabled="versionsBusy||((v.current||!versionAvailable(v))&&v.kind!=='video'&&v.kind!=='render')"
+                        x-text="v.kind==='video'?'查看':v.kind==='render'?'下载':!versionAvailable(v)?'节点已移除':v.current?'当前版本':'恢复'"
+                      ></button></article
+                  ></template>
+                  <button
+                    class="version-more outline"
+                    x-show="contentVersions.length&lt;versionTotal"
+                    :disabled="versionsBusy"
+                    @click="loadContentVersions(true)"
+                  >
+                    加载更多版本
+                  </button>
+                  <div
+                    class="version-empty"
+                    x-show="!versionsBusy&&!versionsError&&!contentVersions.length"
+                  >
+                    <h3>暂无版本记录</h3>
+                    <p>保存图片、镜头要求或文案后，会在这里留下版本。</p>
+                  </div>
+                </section>
+              </div>
+              <div x-show="projectTab==='audit'">
+                <div class="audit-summary">
+                  <div>
+                    <span>生成费用预估</span
+                    ><strong
+                      x-text="audit.entries.length&amp;&amp;!audit.entries.some(e=>e.estimate_cny!=null)?'待估算':'¥'+audit.estimate_cny.toFixed(3).replace(/0$/,'')"
+                    ></strong
+                    ><small
+                      x-text="audit.unestimated_count?audit.unestimated_count+' 条记录信息不足':'全部生成记录均可估算'"
+                    ></small>
+                  </div>
+                  <div>
+                    <span>供应商实际扣费</span><strong>待账单核对</strong
+                    ><small>未将估算当作实际费用</small>
+                  </div>
+                </div>
+                <p class="audit-notice" x-text="audit.notice"></p>
+                <div class="audit-actions">
+                  <button @click="refreshAudit()">刷新记录</button
+                  ><button @click="exportAudit()">导出审计 JSON</button
+                  ><a
+                    href="https://help.aliyun.com/zh/model-studio/model-pricing"
+                    target="_blank"
+                    rel="noreferrer"
+                    >官方价格 ↗</a
+                  >
+                </div>
+                <p
+                  class="project-error"
+                  x-show="auditError"
+                  x-text="auditError"
+                  role="alert"
+                ></p>
+                <p class="subtle" x-show="!audit.entries.length">
+                  尚无生成记录
+                </p>
+                <template x-for="job in audit.entries" :key="job.id"
+                  ><details class="audit-row">
+                    <summary>
+                      <span
+                        class="audit-kind"
+                        x-text="job.kind==='video'?'视频':'修图'"
+                      ></span>
+                      <div>
+                        <strong x-text="job.name"></strong
+                        ><small
+                          x-text="job.model||'历史任务未记录模型'"
+                        ></small>
+                      </div>
+                      <span
+                        class="audit-state"
+                        x-text="projectStateLabel(job.state)"
+                      ></span
+                      ><strong
+                        class="audit-price"
+                        x-text="auditAmount(job)"
+                      ></strong
+                      ><span class="audit-toggle" aria-hidden="true">⌄</span>
+                    </summary>
+                    <dl>
+                      <dt>任务 ID</dt>
+                      <dd x-text="job.id"></dd>
+                      <dt>供应商任务 ID</dt>
+                      <dd x-text="job.provider_request_id||'未返回'"></dd>
+                      <dt>时间</dt>
+                      <dd
+                        x-text="job.created_at?new Date(job.created_at*1000).toLocaleString('zh-CN'):'未记录'"
+                      ></dd>
+                      <dt>用量</dt>
+                      <dd x-text="job.quantity+' '+job.unit"></dd>
+                      <dt>地域</dt>
+                      <dd x-text="job.region||'历史未记录'"></dd>
+                      <dt>采用</dt>
+                      <dd
+                        x-text="job.adopted?'已采用':'未采用（仍保留生成费用记录）'"
+                      ></dd>
+                      <dt>估算依据</dt>
+                      <dd x-text="job.estimate_reason||'模型或用量待核对'"></dd>
+                      <dt>参考单价</dt>
+                      <dd
+                        x-text="job.unit_price_cny==null?'未知':'¥'+job.unit_price_cny+'/'+job.unit"
+                      ></dd>
+                      <dt>价格核对</dt>
+                      <dd>
+                        <span x-text="job.price_checked_at||'未核对'"></span> ·
+                        <a
+                          :href="job.price_source"
+                          target="_blank"
+                          rel="noreferrer"
+                          >供应商报价 ↗</a
+                        >
+                      </dd>
+                      <dt>实际金额</dt>
+                      <dd>待供应商账单核对</dd>
+                    </dl>
+                  </details></template
+                >
+                <p class="subtle audit-local">
+                  本地裁切、调整和合成不调用收费模型；Chat
+                  文本用量另见模型供应商账单。
+                </p>
+              </div>
+            </div>
+            <div class="project-bottom">
+              <a href="/projects">项目列表</a
+              ><a
+                @click="openFullChat($event)"
+                :href="studioChatHref(sharedChatId,workspaceId,active||'')"
+                ><span>完整对话</span
+                ><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <use href="#ui-external"></use></svg></a
+              ><button @click="panel=''">回到画布</button>
+            </div>
+          </div>
+          <template x-if="panel==='note'&&note"
+            ><div class="narrow">
+              <span class="eyebrow">创意备注</span>
+              <h2>记录创意，作为镜头依据</h2>
+              <p class="subtle">
+                保留从 Chat
+                带来的想法。连接到片段后可回看依据；图片和运动要求在片段中设置。
+              </p>
+              <label
+                >备注标题<input
+                  aria-label="备注标题"
+                  x-model="note.title" /></label
+              ><label
+                >想法与要求<textarea
+                  aria-label="备注正文"
+                  x-model="note.text"
+                ></textarea></label
+              ><a
+                class="note-source"
+                x-show="note?.source?.type==='chat'"
+                :href="'/?chat=1&workspace='+workspaceId+'&session='+note?.source?.sessionId+'&message=row-'+note?.source?.messageId"
+                >回到原讨论 ↗</a
+              >
+              <p
+                class="subtle"
+                x-show="note?.source"
+                x-text="'来自：'+(note?.source?.label||'自由讨论')"
+              ></p>
+              <div class="modal-actions">
+                <button @click="panel=''">回到画布</button
+                ><button class="primary" @click="saveNote()">保存备注</button>
+              </div>
+            </div></template
+          >
+          <template x-if="panel==='clip'&&clipEdit"
+            ><div class="clip-editor">
+              <h2>编辑视频片段</h2>
+              <div class="clip-edit-grid">
+                <section class="clip-image-picker">
+                  <div class="row spread">
+                    <h3>用哪张画面</h3>
+                    <div
+                      class="studio-segmented"
+                      role="group"
+                      aria-label="图片使用方式"
+                    >
+                      <button
+                        @click="clipEdit.mode='first'"
+                        :aria-pressed="clipEdit.mode==='first'"
+                      >
+                        首帧</button
+                      ><button
+                        @click="clipEdit.mode='reference'"
+                        :aria-pressed="clipEdit.mode==='reference'"
+                      >
+                        多图参考
+                      </button>
+                    </div>
+                  </div>
+                  <div class="clip-image-options">
+                    <template x-for="a in clipAssets" :key="a.id"
+                      ><button
+                        :class="clipHasImage(a.id)?'chosen':''"
+                        @click="clipChooseImage(a.id)"
+                        :aria-pressed="clipHasImage(a.id)"
+                        :aria-label="'用这张图：'+a.name"
+                      >
+                        <img :src="displayFile(a.file)" :alt="a.name" /><span
+                          x-text="a.name" :title="a.name"
+                        ></span
+                        ><b x-show="clipHasImage(a.id)">✓</b>
+                      </button></template
+                    >
+                  </div>
+                  <p x-show="!clipAssets.length">
+                    先把产品图或参考图放到画布。
+                  </p>
+                  <button
+                    class="outline"
+                    x-show="!clipAssets.length"
+                    @click="panel='';$refs.import.click()"
+                  >
+                    上传一张图片
+                  </button>
+                  <p
+                    class="subtle"
+                    x-text="clipEdit.mode==='first'?'所选图片是视频的起始画面。':'选中的图片用来参考主体或场景，不会直接拼接成视频。'"
+                  ></p>
+                </section>
+                <section class="clip-direction">
+                  <div class="row clip-metadata">
+                    <label
+                      >片段名称<input
+                        x-model="clipEdit.name"
+                        aria-label="编辑片段名称" /></label
+                    ><label
+                      >时长<span class="clip-fixed-duration">5 秒</span></label
+                    >
+                  </div>
+                  <label class="clip-prompt-field"
+                    ><span>画面里发生什么</span><textarea
+                      x-model="clipEdit.prompt"
+                      aria-label="画面变化"
+                      placeholder="例如：产品不动，水面慢慢泛起涟漪。先说你想看到什么，不必写专业提示词。"
+                    ></textarea>
+                  </label>
+                  <details class="clip-assistance">
+                    <summary>辅助设置<span>镜头运动、保留要求与示例</span></summary>
+                    <div class="clip-assistance-body">
+                      <div class="direction-examples">
+                        <span>添加示例</span
+                        ><button
+                          @click="clipExample('产品保持不动，背景水面缓慢泛起涟漪。')"
+                        >
+                          水面轻轻动</button
+                        ><button
+                          @click="clipExample('背景光线从暗到亮，逐渐照亮产品。')"
+                        >
+                          光线慢慢亮</button
+                        ><button
+                          @click="clipExample('产品缓慢转动，展示侧面轮廓。')"
+                        >
+                          展示产品侧面
+                        </button>
+                      </div>
+                      <label>镜头怎么走<span class="optional">可选</span></label>
+                      <div class="camera-choices">
+                        <template
+                          x-for="c in ['固定机位','缓慢推近','缓慢拉远','从左向右移动']"
+                          ><button
+                            :class="clipEdit.camera===c?'chosen':''"
+                            :aria-pressed="clipEdit.camera===c"
+                            @click="clipEdit.camera=clipEdit.camera===c?'':c"
+                            x-text="c"
+                          ></button
+                        ></template>
+                      </div>
+                      <label
+                        >哪些地方要保持不变<span class="optional">可选</span
+                        ><input
+                          x-model="clipEdit.keep"
+                          aria-label="保持不变的内容"
+                          placeholder="例如：瓶身外形、颜色、包装文字"
+                      /></label>
+                    </div>
+                  </details>
+                </section>
+              </div>
+              <div class="modal-actions">
+                <button @click="panel=''">取消</button
+                ><button class="primary" @click="saveClip()">保存片段</button>
+              </div>
+            </div></template
+          >
 
-<div x-show="panel==='edit'" class="precision-editor"><span class="eyebrow" x-text="editSource?.name||'图片'"></span><h2>修好这张图，再用于视频</h2>
-<div class="precision-layout"><section class="precision-visual"><div class="precision-view-label"><span x-text="editReceipt?.state==='succeeded'?'修改前':'当前画面'"></span><span x-text="editScope==='region'?'只改框选区域':'修改整张图片'"></span></div>
-<div class="precision-comparison" :class="editReceipt?.state==='succeeded'?'has-result':''"><div class="edit-bed"><div class="edit-image" :style="editMeta?'width:calc(var(--edit-height) * '+(editMeta.width/editMeta.height)+');aspect-ratio:'+editMeta.width+'/'+editMeta.height:''" @pointerdown.prevent="if(!isEditingRequest){editScope='region';regionDown($event)}" @pointermove="regionMove($event)" @pointerup="regionEnd()" @pointercancel="regionEnd()"><img :src="displayFile(editSource?.file||'source.png')" :alt="editSource?.name||'修改前'" draggable="false"><div class="region" x-show="region&&editScope==='region'" :style="region?'left:'+region.x*100+'%;top:'+region.y*100+'%;width:'+region.w*100+'%;height:'+region.h*100+'%':''"></div></div></div>
-<template x-if="editReceipt?.state==='succeeded'&&editReceipt.output"><figure class="precision-result"><figcaption>修改后</figcaption><img :src="displayFile(editReceipt.output)" alt="真实修图结果"><a :href="editReceipt.output" download="精修结果.png">下载结果 ↗</a></figure></template></div>
-<div class="precision-scope"><button :class="editScope==='whole'?'chosen':''" @click="editScope='whole'" :disabled="isEditingRequest">整张图片</button><button :class="editScope==='region'?'chosen':''" @click="editScope='region'" :disabled="isEditingRequest">只改选区</button><button x-show="region" @click="region=null;editScope='whole'" :disabled="isEditingRequest">清除选区</button><span x-show="editScope==='region'">在图上拖动框选，区域外保留原样</span></div></section>
-<section class="precision-settings"><div class="edit-kind-tabs"><button :class="editMode==='local'?'chosen':''" @click="editMode='local'" :disabled="isEditingRequest">手动调整</button><button :class="editMode==='ai'?'chosen':''" @click="editMode='ai'" :disabled="isEditingRequest">AI 精修</button></div>
-<fieldset :disabled="isEditingRequest||!editMeta||editReceipt?.state==='succeeded'"><div x-show="editMode==='local'"><h3>调整亮度与颜色</h3><template x-for="[key,label] in [['brightness','亮度'],['contrast','对比度'],['saturation','颜色浓度']]" :key="key"><label class="adjustment-slider"><span x-text="label"></span><output x-text="(editAdjust[key]>0?'+':'')+editAdjust[key]+'%'"></output><input type="range" min="-60" max="60" step="5" x-model.number="editAdjust[key]" :aria-label="label"></label></template><button class="primary full" @click="runEdit()">预览调整</button></div>
-<div x-show="editMode==='ai'"><h3>你想改哪里</h3><textarea x-model="repair" aria-label="AI修图要求" maxlength="2000" placeholder="例如：降低选区内的高光，保留产品与其余画面。"></textarea><p class="subtle cloud-notice">图片与要求将发送至百炼，按服务计费。</p><button class="primary full" @click="runEdit()" :disabled="!editMeta?.cloud?.configured">开始 AI 修图</button><p class="warning" x-show="editMeta&&!editMeta.cloud.configured">AI 服务尚未配置，可以先用手动调整。</p></div></fieldset>
-<p class="precision-state" role="status" x-show="editBusy||editReceipt" x-text="editBusy?'正在处理，请稍候…':editState()"></p><p class="precision-error" role="alert" x-show="editError" x-text="editError"></p><button class="outline full" x-show="!editMeta&&!editBusy" @click="reconnectEdit()">重试连接</button><button class="outline full" x-show="['queued','running','unknown'].includes(editReceipt?.state)" @click="checkEdit()" :disabled="editBusy">查看上次修图进度</button>
-<button class="outline full" x-show="editReceipt?.state==='failed'" @click="reconnectEdit()" :disabled="editBusy">重新连接并调整</button><button class="outline full" x-show="editRetryAllowed" @click="retryEdit()" :disabled="editBusy">重新提交这次修图</button><div class="precision-confirm" x-show="editReceipt?.state==='succeeded'"><button class="primary full" @click="applyEdit()" :disabled="editBusy">采用结果，更新画布</button><button class="full" @click="editReceipt=null;editError=''">继续调整原图</button></div>
-<div class="precision-secondary"><button x-show="editAsset?.originalFile&&editAsset.file!==editAsset.originalFile" @click="restoreEditOriginal()" :disabled="isEditingRequest">恢复原图</button><button x-show="editMode==='ai'" @click="saveEdit()" :disabled="isEditingRequest">保存修图要求</button><button x-show="editMode==='ai'" @click="quoteEdit()" :disabled="isEditingRequest">与导演讨论要求 ↗</button><button @click="panel=''">回到画布</button></div></section></div></div>
+          <div x-show="panel==='edit'" class="precision-editor">
+            <span class="eyebrow" x-text="editSource?.name||'图片'"></span>
+            <h2>修好这张图，再用于视频</h2>
+            <div class="precision-layout">
+              <section class="precision-visual">
+                <div class="precision-view-label">
+                  <span
+                    x-text="editReceipt?.state==='succeeded'?'修改前':'当前画面'"
+                  ></span
+                  ><span
+                    x-text="editScope==='region'?'只改框选区域':'修改整张图片'"
+                  ></span>
+                </div>
+                <div
+                  class="precision-comparison"
+                  :class="editReceipt?.state==='succeeded'?'has-result':''"
+                >
+                  <div class="edit-bed">
+                    <div
+                      class="edit-image"
+                      :style="editMeta?'width:calc(var(--edit-height) * '+(editMeta.width/editMeta.height)+');aspect-ratio:'+editMeta.width+'/'+editMeta.height:''"
+                      @pointerdown.prevent="if(!isEditingRequest){editScope='region';regionDown($event)}"
+                      @pointermove="regionMove($event)"
+                      @pointerup="regionEnd()"
+                      @pointercancel="regionEnd()"
+                    >
+                      <img
+                        :src="displayFile(editSource?.file||'source.png')"
+                        :alt="editSource?.name||'修改前'"
+                        draggable="false"
+                      />
+                      <div
+                        class="region"
+                        x-show="region&&editScope==='region'"
+                        :style="region?'left:'+region.x*100+'%;top:'+region.y*100+'%;width:'+region.w*100+'%;height:'+region.h*100+'%':''"
+                      ></div>
+                    </div>
+                  </div>
+                  <template
+                    x-if="editReceipt?.state==='succeeded'&&editReceipt.output"
+                    ><figure class="precision-result">
+                      <figcaption>修改后</figcaption>
+                      <img
+                        :src="displayFile(editReceipt.output)"
+                        alt="真实修图结果"
+                      /><a :href="editReceipt.output" download="精修结果.png"
+                        >下载结果 ↗</a
+                      >
+                    </figure></template
+                  >
+                </div>
+                <div class="precision-scope">
+                  <button
+                    :class="editScope==='whole'?'chosen':''"
+                    @click="editScope='whole'"
+                    :disabled="isEditingRequest"
+                  >
+                    整张图片</button
+                  ><button
+                    :class="editScope==='region'?'chosen':''"
+                    @click="editScope='region'"
+                    :disabled="isEditingRequest"
+                  >
+                    只改选区</button
+                  ><button
+                    x-show="region"
+                    @click="region=null;editScope='whole'"
+                    :disabled="isEditingRequest"
+                  >
+                    清除选区</button
+                  ><span x-show="editScope==='region'"
+                    >在图上拖动框选，区域外保留原样</span
+                  >
+                </div>
+              </section>
+              <section class="precision-settings">
+                <div class="edit-kind-tabs">
+                  <button
+                    :class="editMode==='local'?'chosen':''"
+                    @click="editMode='local'"
+                    :disabled="isEditingRequest"
+                  >
+                    手动调整</button
+                  ><button
+                    :class="editMode==='ai'?'chosen':''"
+                    @click="editMode='ai'"
+                    :disabled="isEditingRequest"
+                  >
+                    AI 精修
+                  </button>
+                </div>
+                <fieldset
+                  :disabled="isEditingRequest||!editMeta||editReceipt?.state==='succeeded'"
+                >
+                  <div x-show="editMode==='local'">
+                    <h3>调整亮度与颜色</h3>
+                    <template
+                      x-for="[key,label] in [['brightness','亮度'],['contrast','对比度'],['saturation','颜色浓度']]"
+                      :key="key"
+                      ><label class="adjustment-slider"
+                        ><span x-text="label"></span
+                        ><output
+                          x-text="(editAdjust[key]>0?'+':'')+editAdjust[key]+'%'"
+                        ></output
+                        ><input
+                          type="range"
+                          min="-60"
+                          max="60"
+                          step="5"
+                          x-model.number="editAdjust[key]"
+                          :aria-label="label" /></label></template
+                    ><button class="primary full" @click="runEdit()">
+                      预览调整
+                    </button>
+                  </div>
+                  <div x-show="editMode==='ai'">
+                    <h3>你想改哪里</h3>
+                    <textarea
+                      x-model="repair"
+                      aria-label="AI修图要求"
+                      maxlength="2000"
+                      placeholder="例如：降低选区内的高光，保留产品与其余画面。"
+                    ></textarea>
+                    <p class="subtle cloud-notice">
+                      图片与要求将发送至百炼，按服务计费。
+                    </p>
+                    <button
+                      class="primary full"
+                      @click="runEdit()"
+                      :disabled="!editMeta?.cloud?.configured"
+                    >
+                      开始 AI 修图
+                    </button>
+                    <p
+                      class="warning"
+                      x-show="editMeta&&!editMeta.cloud.configured"
+                    >
+                      AI 服务尚未配置，可以先用手动调整。
+                    </p>
+                  </div>
+                </fieldset>
+                <p
+                  class="precision-state"
+                  role="status"
+                  x-show="editBusy||editReceipt"
+                  x-text="editBusy?'正在处理，请稍候…':editState()"
+                ></p>
+                <p
+                  class="precision-error"
+                  role="alert"
+                  x-show="editError"
+                  x-text="editError"
+                ></p>
+                <button
+                  class="outline full"
+                  x-show="!editMeta&&!editBusy"
+                  @click="reconnectEdit()"
+                >
+                  重试连接</button
+                ><button
+                  class="outline full"
+                  x-show="['queued','running','unknown'].includes(editReceipt?.state)"
+                  @click="checkEdit()"
+                  :disabled="editBusy"
+                >
+                  查看上次修图进度
+                </button>
+                <button
+                  class="outline full"
+                  x-show="editReceipt?.state==='failed'"
+                  @click="reconnectEdit()"
+                  :disabled="editBusy"
+                >
+                  重新连接并调整</button
+                ><button
+                  class="outline full"
+                  x-show="editRetryAllowed"
+                  @click="retryEdit()"
+                  :disabled="editBusy"
+                >
+                  重新提交这次修图
+                </button>
+                <div
+                  class="precision-confirm"
+                  x-show="editReceipt?.state==='succeeded'"
+                >
+                  <button
+                    class="primary full"
+                    @click="applyEdit()"
+                    :disabled="editBusy"
+                  >
+                    采用结果，更新画布</button
+                  ><button class="full" @click="editReceipt=null;editError=''">
+                    继续调整原图
+                  </button>
+                </div>
+                <div class="precision-secondary">
+                  <button
+                    x-show="editAsset?.originalFile&&editAsset.file!==editAsset.originalFile"
+                    @click="restoreEditOriginal()"
+                    :disabled="isEditingRequest"
+                  >
+                    恢复原图</button
+                  ><button
+                    x-show="editMode==='ai'"
+                    @click="saveEdit()"
+                    :disabled="isEditingRequest"
+                  >
+                    保存修图要求</button
+                  ><button
+                    x-show="editMode==='ai'"
+                    @click="quoteEdit()"
+                    :disabled="isEditingRequest"
+                  >
+                    与导演讨论要求 ↗</button
+                  ><button @click="panel=''">回到画布</button>
+                </div>
+              </section>
+            </div>
+          </div>
 
-<div x-show="panel==='angles'" class="narrow"><span class="eyebrow">补充素材 → 视频片段</span><h2>这段视频，还缺哪个角度？</h2><div class="reference-mini"><template x-if="asset.file"><img :src="displayFile(asset.file)" :alt="asset.name"></template><div><strong x-text="asset.name"></strong><p x-text="'服务于：'+shot.name"></p></div></div><label>需要的画面<select x-model="angle" aria-label="补充角度"><option>侧面 45°</option><option>俯视</option><option>瓶口细节</option><option>场景扩展</option></select></label><label>在视频中的用途<textarea x-model="purpose" aria-label="素材用途"></textarea></label><button class="primary full" @click="addAngle()">加入素材制作要求 →</button></div>
-<div x-show="panel==='plan'" class="narrow"><span class="eyebrow">视频生成</span><label>视频模型<div class="plan-model-options" role="group" aria-label="视频生成模型"><template x-for="p in (videoProvider.options||[])" :key="p.provider"><button :aria-pressed="(shot.videoProvider||videoProvider.provider)===p.provider" :disabled="!p.configured" @click="shot.videoProvider=p.provider;changeVideoProvider()" x-text="p.model+(p.configured?'':' · 未配置')"></button></template><span x-show="!videoProvider.options?.length">正在读取模型…</span></div></label><h2 x-text="shot.name"></h2><div class="plan-inputs"><template x-for="id in inputs" :key="id"><div><img :src="displayFile(getAsset(id).file)" :alt="getAsset(id).name"><span x-text="shot.mode==='first'?'首帧':'参考图'"></span></div></template></div><p class="warning" x-show="!inputs.length">尚未指定输入素材，先从画布选择素材并用于这个视频。</p><p class="plan-prompt" x-text="shot.prompt||'尚未填写视频提示词'"></p><div class="row spread"><span x-text="providerLabel(shot)"></span><a class="subtle" :href="providerFor(shot).price_source" target="_blank" rel="noreferrer" x-text="providerPrice(shot)+' · 价格来源 ↗'"></a></div><div class="saved" x-show="isSaved(shot)">已保存此片段的生成方案</div><div class="modal-actions"><button @click="panel='';focusShot()">返回调整</button><button @click="savePlan()" :disabled="!ready||videoBusy">保存镜头方案</button><button class="primary" :disabled="!ready||videoBusy||!providerFor(shot).configured" @click="generateVideo()" x-text="videoBusy?'正在提交…':'生成这段视频（5秒）'"></button></div><p role="alert" x-show="videoError" x-text="videoError"></p><p class="subtle"><span x-text="providerFor(shot).notice||'生成5秒。按供应商计费。'"></span> 核对视频后再采用到成片。</p></div>
-<template x-if="panel==='video-review'&&selectedVideo"><section class="actual-video-review"><span class="eyebrow">模型视频结果 / 5 秒</span><h2 x-text="selectedVideo.name"></h2><p x-text="videoState(selectedVideo)"></p><div class="actual-video-comparison"><figure><img :src="displayFile(selectedVideo.image)" alt="本次生成使用的首帧"><figcaption>本次首帧</figcaption></figure><figure><video x-show="selectedVideo.media" :src="selectedVideo.media" controls playsinline preload="metadata" aria-label="模型视频候选"></video><figcaption>模型生成的视频</figcaption></figure></div><p class="node-audit" x-text="selectedVideo.model+' · '+auditAmount(selectedVideo.audit)"></p><p>检查产品轮廓、包装文字和有无人物；核对后才能进入成片。</p><p x-text="selectedVideo.prompt"></p><p role="alert" x-show="selectedVideo.error||videoError" x-text="videoError||selectedVideo.error"></p><div class="modal-actions"><button @click="refreshVideo()">查询原任务</button><button @click="prepare(selectedVideo.shot)">重新生成 / 选择模型</button><button @click="panel=''">保留结果，回到画布</button><button class="primary" @click="adoptVideo()" :disabled="videoBusy||selectedVideo.state!=='succeeded'||videoAdopted(selectedVideo)" x-text="videoAdopted(selectedVideo)?'已经采用':selectedVideo.stale?'采用历史视频':'采用这段视频'"></button></div></section></template>
-<div x-show="panel==='script'" class="narrow"><span class="eyebrow">成片声音 / 可选</span><h2>让谁来讲，讲什么</h2><p class="subtle">这一稿用于旁白或人物讲解；镜头运动仍在各视频片段中描述。</p><label class="row"><input type="checkbox" x-model="voice">为成片加入讲解</label><label>口播正文<textarea aria-label="口播正文" x-model="narration"></textarea></label><div class="modal-actions"><button @click="ask('整支短片的讲解口播');panel=''">与助手打磨</button><button class="primary" @click="if(persist()){panel='';notify('口播稿已保存')}">保存口播稿</button></div></div>
-</section></div><div class="toast" :class="toastUndo?'has-undo':''" x-show="toast" x-cloak x-transition role="status"><span x-text="toast"></span><button x-show="toastUndo" @click="undo();toastUndo=false">撤销删除</button></div>
+          <div x-show="panel==='angles'" class="narrow">
+            <span class="eyebrow">补充素材 → 视频片段</span>
+            <h2>这段视频，还缺哪个角度？</h2>
+            <div class="reference-mini">
+              <template x-if="asset.file"
+                ><img :src="displayFile(asset.file)" :alt="asset.name"
+              /></template>
+              <div>
+                <strong x-text="asset.name"></strong>
+                <p x-text="'服务于：'+shot.name"></p>
+              </div>
+            </div>
+            <label
+              >需要的画面<select x-model="angle" aria-label="补充角度">
+                <option>侧面 45°</option>
+                <option>俯视</option>
+                <option>瓶口细节</option>
+                <option>场景扩展</option>
+              </select></label
+            ><label
+              >在视频中的用途<textarea
+                x-model="purpose"
+                aria-label="素材用途"
+              ></textarea></label
+            ><button class="primary full" @click="addAngle()">
+              加入素材制作要求 →
+            </button>
+          </div>
+          <div x-show="panel==='plan'" class="narrow">
+            <span class="eyebrow">视频生成</span
+            ><label
+              >视频模型
+              <div
+                class="plan-model-options"
+                role="group"
+                aria-label="视频生成模型"
+              >
+                <template
+                  x-for="p in (videoProvider.options||[])"
+                  :key="p.provider"
+                  ><button
+                    :aria-pressed="(shot.videoProvider||videoProvider.provider)===p.provider"
+                    :disabled="!p.configured"
+                    @click="shot.videoProvider=p.provider;changeVideoProvider()"
+                    x-text="p.model+(p.configured?'':' · 未配置')"
+                  ></button></template
+                ><span x-show="!videoProvider.options?.length"
+                  >正在读取模型…</span
+                >
+              </div></label
+            >
+            <h2 x-text="shot.name"></h2>
+            <div class="plan-inputs">
+              <template x-for="id in inputs" :key="id"
+                ><div>
+                  <img
+                    :src="displayFile(getAsset(id).file)"
+                    :alt="getAsset(id).name"
+                  /><span
+                    x-text="shot.mode==='first'?'首帧':'参考图'"
+                  ></span></div
+              ></template>
+            </div>
+            <p class="warning" x-show="!inputs.length">
+              尚未指定输入素材，先从画布选择素材并用于这个视频。
+            </p>
+            <p
+              class="plan-prompt"
+              x-text="shot.prompt||'尚未填写视频提示词'"
+            ></p>
+            <div class="row spread">
+              <span x-text="providerLabel(shot)"></span
+              ><a
+                class="subtle"
+                :href="providerFor(shot).price_source"
+                target="_blank"
+                rel="noreferrer"
+                x-text="providerPrice(shot)+' · 价格来源 ↗'"
+              ></a>
+            </div>
+            <div class="saved" x-show="isSaved(shot)">
+              已保存此片段的生成方案
+            </div>
+            <div class="modal-actions">
+              <button @click="panel='';focusShot()">返回调整</button
+              ><button @click="savePlan()" :disabled="!ready||videoBusy">
+                保存镜头方案</button
+              ><button
+                class="primary"
+                :disabled="!ready||videoBusy||!providerFor(shot).configured"
+                @click="generateVideo()"
+                x-text="videoBusy?'正在提交…':'生成这段视频（5秒）'"
+              ></button>
+            </div>
+            <p role="alert" x-show="videoError" x-text="videoError"></p>
+            <p class="subtle">
+              <span
+                x-text="providerFor(shot).notice||'生成5秒。按供应商计费。'"
+              ></span>
+              核对视频后再采用到成片。
+            </p>
+          </div>
+          <template x-if="panel==='video-review'&&selectedVideo"
+            ><section class="actual-video-review">
+              <span class="eyebrow">模型视频结果 / 5 秒</span>
+              <h2 x-text="selectedVideo.name"></h2>
+              <p x-text="videoState(selectedVideo)"></p>
+              <div class="actual-video-comparison">
+                <figure>
+                  <img
+                    :src="displayFile(selectedVideo.image)"
+                    alt="本次生成使用的首帧"
+                  />
+                  <figcaption>本次首帧</figcaption>
+                </figure>
+                <figure>
+                  <video
+                    x-show="selectedVideo.media"
+                    :src="selectedVideo.media"
+                    controls
+                    playsinline
+                    preload="metadata"
+                    aria-label="模型视频候选"
+                  ></video>
+                  <figcaption>模型生成的视频</figcaption>
+                </figure>
+              </div>
+              <p
+                class="node-audit"
+                x-text="selectedVideo.model+' · '+auditAmount(selectedVideo.audit)"
+              ></p>
+              <p>检查产品轮廓、包装文字和有无人物；核对后才能进入成片。</p>
+              <p x-text="selectedVideo.prompt"></p>
+              <p
+                role="alert"
+                x-show="selectedVideo.error||videoError"
+                x-text="videoError||selectedVideo.error"
+              ></p>
+              <div class="modal-actions">
+                <button @click="refreshVideo()">查询原任务</button
+                ><button @click="prepare(selectedVideo.shot)">
+                  重新生成 / 选择模型</button
+                ><button @click="panel=''">保留结果，回到画布</button
+                ><button
+                  class="primary"
+                  @click="adoptVideo()"
+                  :disabled="videoBusy||selectedVideo.state!=='succeeded'||videoAdopted(selectedVideo)"
+                  x-text="videoAdopted(selectedVideo)?'已经采用':selectedVideo.stale?'采用历史视频':'采用这段视频'"
+                ></button>
+              </div></section
+          ></template>
+          <div x-show="panel==='script'" class="narrow">
+            <span class="eyebrow">成片声音 / 可选</span>
+            <h2>让谁来讲，讲什么</h2>
+            <p class="subtle">
+              这一稿用于旁白或人物讲解；镜头运动仍在各视频片段中描述。
+            </p>
+            <label class="row"
+              ><input type="checkbox" x-model="voice" />为成片加入讲解</label
+            ><label
+              >口播正文<textarea
+                aria-label="口播正文"
+                x-model="narration"
+              ></textarea>
+            </label>
+            <div class="modal-actions">
+              <button @click="ask('整支短片的讲解口播');panel=''">
+                与助手打磨</button
+              ><button
+                class="primary"
+                @click="if(persist()){panel='';notify('口播稿已保存')}"
+              >
+                保存口播稿
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+      <div
+        class="toast"
+        :class="toastUndo?'has-undo':''"
+        x-show="toast"
+        x-cloak
+        x-transition
+        role="status"
+      >
+        <span x-text="toast"></span
+        ><button x-show="toastUndo" @click="undo();toastUndo=false">
+          撤销删除
+        </button>
+      </div>
 
-<div class="full-precision" x-show="fullEditor" x-cloak role="dialog" aria-modal="true" aria-label="完整精修工作区">
-  <button class="editor-loading-back" x-show="!editorReady&&!editorCandidate" @click="closeFullEditor()">← 返回自由画布</button><div class="editor-loading" x-show="editorLoading&&!editorFailure">正在打开精修工作区…</div>
-  <div class="editor-connection-error" x-show="editorFailure&&!editorCandidate" role="alert"><span x-text="editorFailure"></span><div class="editor-error-actions"><button x-show="canRefreshComparison" @click="refreshEditorComparison()" :disabled="editorApplying" x-text="editorApplying?'正在更新比较…':'重新比较'"></button><button @click="closeFullEditor()" :disabled="editorApplying">返回画布</button></div></div>
-  <template x-if="editorUrl"><iframe :inert="!!editorCandidate" x-ref="fullEditor" :src="editorUrl" title="精细修图：图层、选区、调整与历史" @load="editorLoading=false"></iframe></template>
-  <template x-if="editorCandidate"><div class="full-edit-review" role="dialog" aria-label="比较并采用精修图">
-    <div class="full-review-heading"><div><span x-text="editSource?.name"></span><h2>采用这次修改？</h2><p x-text="affectedClips.length?'更新 '+affectedClips.length+' 个镜头的图片输入':'更新画布中的图片'"></p></div><button @click="continueFullPrecision()" :disabled="editorApplying">基于此版继续</button><button @click="closeFullEditor()" :disabled="editorApplying">保留当前图</button></div>
-    <div class="full-review-error" x-show="editorFailure" role="alert"><span x-text="editorFailure"></span><button x-show="canRefreshComparison" @click="refreshEditorComparison()" :disabled="editorApplying" x-text="editorApplying?'正在更新比较…':'重新比较'"></button></div>
-    <div class="full-review-images"><figure><img :src="displayFile(previewBefore || editSource?.file)" alt="画布当前采用的图片"><figcaption x-text="(editorCandidate?.comparison||editorCandidate?.legacyComparison)?'当前工作图':'当前图片'"></figcaption></figure><figure><img :src="displayFile(editorCandidate?.output)" alt="精修后的完整画面"><figcaption>修改后</figcaption></figure></div>
-    <div class="full-review-footer"><span>已有视频保留，重新生成需手动操作</span><button @click="compareZoom=true">查看细节</button><button class="primary" @click="adoptFullEditor()" :disabled="editorApplying" x-text="editorApplying?(editorComparing?'正在比较…':'正在保存…'):'采用并回画布'"></button></div>
-    <div class="full-review-zoom" x-show="compareZoom" role="dialog" aria-label="原始像素对照"><button @click="compareZoom=false">返回完整对比</button><p>按原始像素查看，可滚动检查文字、瓶口和边缘。</p><div><figure><figcaption>修改前</figcaption><img :src="displayFile(previewBefore || editSource?.file)" alt="放大修改前画面"></figure><figure><figcaption>修改后</figcaption><img :src="displayFile(editorCandidate?.output)" alt="放大精修后画面"></figure></div></div>
-  </div></template>
-</div>
-</div></body></html>
+      <div
+        class="full-precision embedded-precision"
+        x-show="fullEditor"
+        x-cloak
+        role="dialog"
+        aria-modal="true"
+        aria-label="完整精修工作区"
+      >
+        <aside class="precision-source-context">
+          <span>精细编辑</span>
+          <h2 x-text="editSource?.name||'项目图片'"></h2>
+          <template x-if="editSource?.file"><img :src="displayFile(editSource.file)" alt="当前画布原图" /></template>
+          <p x-text="affectedClips.length?'关联 '+affectedClips.length+' 个镜头':'当前画布素材'"></p>
+          <p>采用后更新原节点，已有视频保留其生成来源。</p>
+          <button @click="closeFullEditor()" :disabled="editorApplying">返回画布</button>
+        </aside>
+        <button
+          class="editor-loading-back"
+          x-show="!editorReady&&!editorCandidate"
+          @click="closeFullEditor()"
+        >
+          ← 返回自由画布
+        </button>
+        <div class="editor-loading" x-show="editorLoading&&!editorFailure">
+          正在打开精修工作区…
+        </div>
+        <div
+          class="editor-connection-error"
+          x-show="editorFailure&&!editorCandidate"
+          role="alert"
+        >
+          <span x-text="editorFailure"></span>
+          <div class="editor-error-actions">
+            <button
+              x-show="canRefreshComparison"
+              @click="refreshEditorComparison()"
+              :disabled="editorApplying"
+              x-text="editorApplying?'正在更新比较…':'重新比较'"
+            ></button
+            ><button @click="closeFullEditor()" :disabled="editorApplying">
+              返回画布
+            </button>
+          </div>
+        </div>
+        <template x-if="editorUrl"
+          ><iframe
+            :inert="!!editorCandidate"
+            x-ref="fullEditor"
+            :src="editorUrl"
+            title="精细修图：图层、选区、调整与历史"
+            @load="editorLoading=false"
+          ></iframe
+        ></template>
+        <template x-if="editorCandidate"
+          ><div
+            class="full-edit-review"
+            role="dialog"
+            aria-label="比较并采用精修图"
+          >
+            <div class="full-review-heading">
+              <div>
+                <span x-text="editSource?.name"></span>
+                <h2>采用这次修改？</h2>
+                <p
+                  x-text="affectedClips.length?'更新 '+affectedClips.length+' 个镜头的图片输入':'更新画布中的图片'"
+                ></p>
+              </div>
+              <button
+                @click="continueFullPrecision()"
+                :disabled="editorApplying"
+              >
+                基于此版继续</button
+              ><button @click="closeFullEditor()" :disabled="editorApplying">
+                保留当前图
+              </button>
+            </div>
+            <div class="full-review-error" x-show="editorFailure" role="alert">
+              <span x-text="editorFailure"></span
+              ><button
+                x-show="canRefreshComparison"
+                @click="refreshEditorComparison()"
+                :disabled="editorApplying"
+                x-text="editorApplying?'正在更新比较…':'重新比较'"
+              ></button>
+            </div>
+            <div class="full-review-images">
+              <figure>
+                <img
+                  :src="displayFile(previewBefore || editSource?.file)"
+                  alt="画布当前采用的图片"
+                />
+                <figcaption
+                  x-text="(editorCandidate?.comparison||editorCandidate?.legacyComparison)?'当前工作图':'当前图片'"
+                ></figcaption>
+              </figure>
+              <figure>
+                <img
+                  :src="displayFile(editorCandidate?.output)"
+                  alt="精修后的完整画面"
+                />
+                <figcaption>修改后</figcaption>
+              </figure>
+            </div>
+            <div class="full-review-footer">
+              <span>已有视频保留，重新生成需手动操作</span
+              ><button @click="compareZoom=true">查看细节</button
+              ><button
+                class="primary"
+                @click="adoptFullEditor()"
+                :disabled="editorApplying"
+                x-text="editorApplying?(editorComparing?'正在比较…':'正在保存…'):'采用并回画布'"
+              ></button>
+            </div>
+            <div
+              class="full-review-zoom"
+              x-show="compareZoom"
+              role="dialog"
+              aria-label="原始像素对照"
+            >
+              <button @click="compareZoom=false">返回完整对比</button>
+              <p>按原始像素查看，可滚动检查文字、瓶口和边缘。</p>
+              <div>
+                <figure>
+                  <figcaption>修改前</figcaption>
+                  <img
+                    :src="displayFile(previewBefore || editSource?.file)"
+                    alt="放大修改前画面"
+                  />
+                </figure>
+                <figure>
+                  <figcaption>修改后</figcaption>
+                  <img
+                    :src="displayFile(editorCandidate?.output)"
+                    alt="放大精修后画面"
+                  />
+                </figure>
+              </div>
+            </div></div
+        ></template>
+      </div>
+    </div>
+  </body>
+</html>

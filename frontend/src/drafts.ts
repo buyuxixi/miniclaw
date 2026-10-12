@@ -6,7 +6,7 @@ export function loadDraft(owner: string): Draft {
     const saved = JSON.parse(localStorage.getItem(`miniclaw.draft.${owner}`) ?? 'null');
     if (!saved || typeof saved.text !== 'string' || !Array.isArray(saved.attachments)) return blank();
     return { text: saved.text.slice(0, 100000), skill: typeof saved.skill === 'string' ? saved.skill : undefined,
-      attachments: saved.attachments.filter((a: Attachment) => a && typeof a.id === 'string' && typeof a.name === 'string' && ['image', 'text'].includes(a.kind)).slice(0, 4) };
+      attachments: saved.attachments.filter((a: Attachment) => a && typeof a.id === 'string' && typeof a.name === 'string' && ['image', 'text', 'document'].includes(a.kind)).slice(0, 10) };
   } catch { return blank(); }
 }
 export function saveDraft(owner: string, draft: Draft): boolean {

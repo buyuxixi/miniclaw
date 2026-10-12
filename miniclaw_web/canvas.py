@@ -705,6 +705,9 @@ class Canvas:
                 if job["signature"] != signature:
                     raise ValueError("同一请求ID不能更换参数")
                 return self.job(project, job_id)
+            clarification_service = getattr(self, 'clarifications', None)
+            if clarification_service:
+                clarification_service.guard_manual(project=project)
             row, layer = self._target(project, revision, layer_id)
             mask = (
                 self._selection(project, row, layer, selection_id)
@@ -906,6 +909,8 @@ class Canvas:
 
     def adopt(self, project, revision, job_id):
         with self.lock:
+            clarification_service = getattr(self, 'clarifications', None)
+            if clarification_service: clarification_service.guard_manual(project=project)
             return self._adopt(project, revision, job_id)
 
     def _adopt(self, project, revision, job_id):

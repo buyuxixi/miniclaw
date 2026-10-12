@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { readApi, writeApi } from './management-api';
 import { exportBlob, projectPath, type Project, type CanvasCapabilities } from './canvas-api';
 import { GenerationPrice } from './GenerationPrice';
+import {fullImagePlanPrompt} from './director-conversation';
 
 export interface ImagePlan {
   id: string; project: string; revision: number; input_revision: number;
@@ -39,7 +40,7 @@ export function ImagePlanReview({ candidate, busy, onClose, onApply }: {
   </dialog>;
 }
 
-export function ImagePlanPanel({ project, busy, activeJob = false, canPlan, hasTarget, targetLayerId, hasSubjectSelection = false, onSend, onRun, onRefresh, onPreview, compact = false }: {
+export function ImagePlanPanel({ project, busy, activeJob = false, canPlan, hasTarget, targetLayerId, hasSubjectSelection = false, onSend, onRun, onRefresh, onPreview, compact = false, plans:providedPlans, onPlansRefresh, onFillPrompt, onPrecision, onDraft }: {
   project: Project; busy: boolean; activeJob?: boolean; canPlan: boolean; hasTarget: boolean;
   targetLayerId?: string; hasSubjectSelection?: boolean;
   onSend: (goal: string) => Promise<void>;
@@ -47,19 +48,26 @@ export function ImagePlanPanel({ project, busy, activeJob = false, canPlan, hasT
   onRefresh: () => Promise<void>;
   onPreview?: (preview: PlanPreview) => Promise<void>;
   compact?: boolean;
+  plans?:ImagePlan[];
+  onPlansRefresh?:()=>Promise<void>;
+  onFillPrompt?:(plan:ImagePlan)=>Promise<void>;
+  onPrecision?:()=>void;
+  onDraft?:(text:string)=>void;
 }) {
   const [goal, setGoal] = useState('');
   const [backgroundColor, setBackgroundColor] = useState('#f2efe7');
-  const [plans, setPlans] = useState<ImagePlan[]>([]);
+  const [loadedPlans, setPlans] = useState<ImagePlan[]>([]);
+  const plans=providedPlans??loadedPlans;
   const [error, setError] = useState('');
   const [candidate, setCandidate] = useState<Preview>();
   const [showHistory, setShowHistory] = useState(false);
   const [cloud,setCloud] = useState<CanvasCapabilities['cloud']>();
-  useEffect(()=>{let alive=true;void readApi<CanvasCapabilities>('/api/miniclaw/canvas/capabilities').then(v=>{if(alive)setCloud(v.cloud)}).catch(()=>{});return()=>{alive=false}},[]);
+  useEffect(()=>{if(compact)return;let alive=true;void readApi<CanvasCapabilities>('/api/miniclaw/canvas/capabilities').then(v=>{if(alive)setCloud(v.cloud)}).catch(()=>{});return()=>{alive=false}},[compact]);
   const request = useRef(0);
   const current = useRef(project);
   current.current = project;
   async function reload() {
+    if(providedPlans!==undefined){await onPlansRefresh?.();return;}
     const serial = ++request.current;
     try {
       const next = await readApi<ImagePlan[]>(`${projectPath(project.id)}/plans`);
@@ -69,10 +77,11 @@ export function ImagePlanPanel({ project, busy, activeJob = false, canPlan, hasT
     }
   }
   useEffect(() => {
+    if(providedPlans!==undefined)return;
     void reload();
     const timer = setInterval(() => void reload(), 2500);
     return () => { clearInterval(timer); ++request.current; };
-  }, [project.id, project.revision]);
+  }, [project.id, project.revision, providedPlans!==undefined]);
   useEffect(() => {
     if (candidate && (candidate.plan.project !== project.id || candidate.plan.revision !== project.revision)) setCandidate(undefined);
   }, [project.id, project.revision, candidate]);
@@ -130,7 +139,7 @@ export function ImagePlanPanel({ project, busy, activeJob = false, canPlan, hasT
       const ai = plan.steps.at(-1)?.action === 'ai_edit';
       const local = plan.steps.some(s => s.action !== 'ai_edit');
       if (compact && ['applied','canceled'].includes(plan.state)) return <article className="image-plan-complete" key={plan.id}>
-        <div><span className="plan-complete-status">{plan.state==='canceled'?'已取消':stale?'曾应用 · 图已更新':'已应用'}</span><strong>{plan.goal}</strong><button disabled={busy} onClick={()=>void onSend(`继续修改：${plan.goal}\n必须保留：${plan.preserve}\n这次还想调整：`)}>继续调整</button></div>
+        <div><span className="plan-complete-status">{plan.state==='canceled'?'已取消':stale?'曾应用 · 图已更新':'已应用'}</span><strong>{plan.goal}</strong><button disabled={busy} onClick={()=>{const text=`继续修改：${plan.goal}\n必须保留：${plan.preserve}\n这次还想调整：`;if(onDraft)onDraft(text);else void onSend(text);}}>继续调整</button></div>
         <details><summary>查看修改详情</summary><p>必须保留：{plan.preserve || '未指定'}</p><ol>{plan.steps.map((s,i)=><li key={i}>{s.label}</li>)}</ol><pre>{JSON.stringify(plan.steps.map(s=>({action:s.action,params:s.params})),null,2)}</pre><p>已应用的本地修改可从画布历史撤销。</p></details>
       </article>;
       return <article className="image-plan-card" key={plan.id}>
@@ -138,15 +147,16 @@ export function ImagePlanPanel({ project, busy, activeJob = false, canPlan, hasT
         <p>必须保留：{plan.preserve || '未指定，请先核对修改范围'}</p>
         <ol>{plan.steps.map((s, i) => <li key={i}>{s.label}{s.action === 'ai_edit' && <small>{String(s.params.prompt)}</small>}</li>)}</ol>
         <details><summary>查看具体参数</summary><pre>{JSON.stringify(plan.steps.map(s => ({ action:s.action, params:s.params })), null, 2)}</pre></details>
-        <p className="canvas-hint">{plan.state === 'canceled' ? '已取消；已应用的本地修改可以从历史撤销。' : plan.state === 'applied' ? stale ? '本方案曾应用，当前工作图已变化。可以继续提出新要求。' : '本地修改已应用，可从历史撤销或继续提新要求。' : plan.state === 'submitted' ? '已提交一次AI候选，请在下方任务结果中比较。' : stale ? '工作图已变化，本方案过期，请重新提出修改要求。' : ai ? local ? '包含一次云端编辑，可能计费；本地修改先预览。' : '点击生成会提交一次云端编辑，可能计费。原图保留。' : '本机完成，无云端图片调用。'}</p>
+        <p className="canvas-hint">{compact&&ai?plan.state==='submitted'?'已提交候选，先比较结果；继续调整可回填画布。':fullImagePlanPrompt(plan)?'确认修改要求后回填画布，再选择模型生成。':'此方案包含选区或本地步骤，请在精细修图中继续。':plan.state === 'canceled' ? '已取消；已应用的本地修改可以从历史撤销。' : plan.state === 'applied' ? stale ? '本方案曾应用，当前工作图已变化。可以继续提出新要求。' : '本地修改已应用，可从历史撤销或继续提新要求。' : plan.state === 'submitted' ? '已提交一次AI候选，请在下方任务结果中比较。' : stale ? '工作图已变化，本方案过期，请重新提出修改要求。' : ai ? local ? '包含一次云端编辑，可能计费；本地修改先预览。' : '点击生成会提交一次云端编辑，可能计费。原图保留。' : '本机完成，无云端图片调用。'}</p>
         <div className="canvas-button-grid">
-          {ai && <GenerationPrice cloud={cloud}/>}
+          {ai && !compact && <GenerationPrice cloud={cloud}/>}
+          {compact&&ai&&(fullImagePlanPrompt(plan)&&onFillPrompt?<button className="canvas-primary" disabled={busy} onClick={()=>void onRun(()=>onFillPrompt(plan))}>回填画布，选择模型</button>:onPrecision&&<button disabled={busy} onClick={onPrecision}>打开精细修图</button>)}
           {local && ['proposed','ready'].includes(plan.state) && <button disabled={busy || stale || activeJob} onClick={() => void onRun(() => preview(plan))}>预览本地修改</button>}
-          {ai && (plan.state === 'prepared' || !local && plan.state === 'proposed') && <button disabled={busy || stale || activeJob} onClick={() => void onRun(async () => {
+          {!compact && ai && (plan.state === 'prepared' || !local && plan.state === 'proposed') && <button disabled={busy || stale || activeJob} onClick={() => void onRun(async () => {
             await writeApi(`${projectPath(project.id)}/plans/${plan.id}/generate`, 'POST', { revision: project.revision });
             await onRefresh(); await reload();
           })}>生成AI候选 · 可能计费</button>}
-          <button disabled={busy} onClick={() => { const prompt=`继续修改：${plan.goal}\n必须保留：${plan.preserve}\n这次还想调整：`; if (compact) void onSend(prompt); else setGoal(prompt); }}>继续调整要求</button>
+          <button disabled={busy} onClick={() => { const prompt=`继续修改：${plan.goal}\n必须保留：${plan.preserve}\n这次还想调整：`; if(onDraft)onDraft(prompt);else if (compact) void onSend(prompt); else setGoal(prompt); }}>继续调整要求</button>
           {!['canceled','applied'].includes(plan.state) && <button disabled={busy} onClick={() => void onRun(async () => {
             await writeApi(`${projectPath(project.id)}/plans/${plan.id}/cancel`, 'POST', {}); await onRefresh(); await reload();
           })}>取消方案</button>}

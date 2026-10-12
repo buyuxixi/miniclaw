@@ -31,8 +31,8 @@ class Studio(StudioProjects):
             db.execute('CREATE TABLE IF NOT EXISTS studio_projects (workspace TEXT PRIMARY KEY, name TEXT NOT NULL, origin TEXT)')
             db.execute('CREATE TABLE IF NOT EXISTS studio_image_requests (workspace TEXT, id TEXT, signature TEXT, data TEXT, PRIMARY KEY(workspace,id))')
         canvas.submission_policy = self.reserve
-        from .decisions import JevDecisions, JevConfig
-        self.decisions = JevDecisions(store, JevConfig.from_env())
+        from .decision_routing import decision_service
+        self.decisions = decision_service(store)
         self._video=None;self.root=Path(root)
 
     @property
@@ -124,7 +124,7 @@ class Studio(StudioProjects):
         return {'chat_id': owner}
 
     def context(self, request, owner):
-        if not isinstance(request, dict) or set(request) - {'workspace', 'target', 'revision'}:
+        if not isinstance(request, dict) or set(request) - {'workspace', 'target', 'revision', 'references'}:
             raise ValueError('项目引用无效')
         workspace = request.get('workspace')
         self.workspaces.identifier(workspace)
@@ -142,6 +142,15 @@ class Studio(StudioProjects):
         selected = next((o for o in objects if o['id'] == target), None)
         if target and not selected:
             raise ValueError('引用对象已删除，请重新选择')
+        references = request.get('references')
+        if references is not None:
+            from .studio_references import resolve_references
+            snapshots, paths = resolve_references(self, workspace, state, references, owner)
+            # Added references cannot replace the separately retained focus.
+            if target and target not in references:
+                raise ValueError('修改对象与本轮引用不一致，请明确修改对象')
+            for snapshot in snapshots:
+                snapshot['current'] = snapshot['id'] == target
         def summary(obj):return {k:v for k,v in obj.items() if k not in ('file','originalFile','versions','region','x','y','w','h')}
         data = {'workspace': workspace, 'revision': record['revision'], 'name':(self.project_info(workspace) or {}).get('name','创作项目'), 'requirements': state.get('facts', ''),
                 'target': summary(selected) if selected else None, 'assets': [summary(o) for o in state['assets']],
@@ -149,6 +158,9 @@ class Studio(StudioProjects):
         data['video_tasks']=[{k:j.get(k) for k in ('id','shot','name','state','duration','stale','error')} for j in self.video.list(workspace)]
         data['adopted_sequence']=state['sequence'];data['outputs']=self.video.renders(workspace)
         data['content_versions']=manifest
+        if references is not None:
+            data['references'] = snapshots
+            data['_reference_paths'] = paths
         return data
 
     @staticmethod
@@ -226,6 +238,9 @@ class Studio(StudioProjects):
                 'width':output['width'] if output else None, 'height':output['height'] if output else None}
 
     def submit_image(self, workspace, request):
+        clarification_service = getattr(self, 'clarifications', None)
+        if clarification_service:
+            clarification_service.guard_manual(workspace=workspace)
         if set(request) != {'request_id','revision','object','task','provider','model','prompt'}:
             raise ValueError('图片任务参数无效')
         rid = self.workspaces.identifier(request['request_id'])
@@ -452,16 +467,36 @@ def routes(studio, body, session, persist, creator=None):
         if origin and origin.rstrip('/')!=str(request.base_url).rstrip('/'): raise HTTPException(403,'仅允许本工作区操作')
         return await body(request,8*1024*1024)
     @router.get('/api/workspaces')
-    async def list_projects(owner:str|None=None,page:int|None=None,page_size:int=6,q:str=''):
+    async def list_projects(owner:str|None=None,page:int|None=None,page_size:int=6,q:str='',archived:bool=False):
         from fastapi.responses import JSONResponse
         from hermes_cli.web_server import _SESSION_TOKEN
-        response=JSONResponse(await call(studio.project_list,owner,page,page_size,q))
+        response=JSONResponse(await call(studio.project_list,owner,page,page_size,q,None,archived))
         response.set_cookie('studio_media',_SESSION_TOKEN,httponly=True,samesite='strict',path='/studio/media')
         return response
     @router.post('/api/workspaces')
     async def create_project(request:Request):
         p=await checked(request);live=session(p.get('session_id'));persist(live)
         return await call(studio.create_project,p,live['session_key'])
+    # Library routes are registered before /api/workspaces/{workspace} so "library" is never read as a project id.
+    @router.get('/api/workspaces/library')
+    async def library(q:str=''):return await call(studio.library_list,q)
+    @router.post('/api/workspaces/library/{obj}/remove')
+    async def library_remove(obj:str,request:Request):
+        await checked(request);return await call(studio.library_remove,obj)
+    @router.post('/api/workspaces/{workspace}/archive')
+    async def archive(workspace:str,request:Request):
+        p=await checked(request)
+        if set(p) not in ({'archived'},{'archived','collect'}):raise HTTPException(400,'请提供归档状态')
+        collected=await call(studio.library_collect,workspace) if p.get('collect') is True else []
+        return {**await call(studio.set_archived,workspace,p['archived']),'collected':len(collected)}
+    @router.post('/api/workspaces/{workspace}/library')
+    async def library_add(workspace:str,request:Request):
+        p=await checked(request)
+        if set(p)!={'file','name'}:raise HTTPException(400,'请提供文件和素材名')
+        return await call(studio.library_add,workspace,p['file'],p['name'])
+    @router.post('/api/workspaces/{workspace}/library/{obj}/use')
+    async def library_use(workspace:str,obj:str,request:Request):
+        await checked(request);return await call(studio.library_use,workspace,obj)
     @router.get('/api/workspaces/{workspace}/info')
     async def info(workspace:str):return await call(studio.project_info,workspace)
     @router.post('/api/workspaces/import-creator/{identifier}')
@@ -509,6 +544,19 @@ def routes(studio, body, session, persist, creator=None):
             with Image.open(io.BytesIO(raw)) as image:width,height=image.size
             return dict(file=studio.store.media.url(obj['id']),object_id=obj['id'],width=width,height=height,name=name)
         return await call(publish)
+    @router.post('/api/workspaces/{workspace}/assets/from-chat')
+    async def add_chat_image(workspace:str,request:Request):
+        p=await checked(request)
+        if not isinstance(p,dict) or set(p)!={'request_id','session_id','attachment'}:raise HTTPException(400,'请选择当前对话中的图片')
+        if not isinstance(p['session_id'],str) or not 1<=len(p['session_id'])<=128:raise HTTPException(400,'运行会话标识无效')
+        live=session(p['session_id'])
+        return await call(studio.add_chat_image,workspace,p,live['session_key'])
+    @router.get('/api/workspaces/{workspace}/assets/chat')
+    async def chat_materials(workspace:str):
+        return await call(studio.chat_materials,workspace)
+    @router.post('/api/workspaces/{workspace}/assets/import-chat')
+    async def import_chat_material(workspace:str,request:Request):
+        return await call(studio.import_chat_material,workspace,await checked(request))
     @router.get('/api/workspaces/{workspace}/chat')
     async def chat(workspace:str): return {'chat_id':await call(studio.chat,workspace)}
     @router.post('/api/workspaces/{workspace}/chat')
@@ -619,15 +667,21 @@ def routes(studio, body, session, persist, creator=None):
         if kind not in ('video','render') or not secrets.compare_digest(request.cookies.get('studio_media',''),_SESSION_TOKEN):raise HTTPException(401)
         path=await call(studio.video.media,identifier,kind)
         return FileResponse(path,media_type='video/mp4',headers={'Cache-Control':'no-store'},filename='product-film.mp4' if request.query_params.get('download') else None)
+    @router.get('/p/{workspace}')
+    async def project_page(workspace:str,request:Request):
+        await call(studio.workspaces.identifier,workspace)
+        return await static('index.html',request)
+
     @router.get('/studio/{path:path}')
     async def static(path:str,request:Request):
         path=path or 'index.html'
-        allowed={'index.html','app.js','usability.js','workflow.js','integration.js','production.js','node-composer.js','interaction.js','node-composer.css','workbench.css','project-name.js','style.css','source.png','macro.png','hero.png','frame-end.png','candidate.mp4','vendor/alpine.min.js'}
+        allowed={'index.html','app.js','usability.js','workflow.js','integration.js','production.js','node-composer.js','interaction.js','tokens.css','project-name.js','style.css','source.png','macro.png','hero.png','frame-end.png','candidate.mp4','vendor/alpine.min.js'}
         if path not in allowed: raise HTTPException(404)
         if path=='index.html':
             from hermes_cli.web_server import _SESSION_TOKEN
             content=(studio.folder/path).read_text(encoding='utf-8').replace('__WORKSPACE_TOKEN__',_SESSION_TOKEN)
-            for asset_name in ('app.js','usability.js','workflow.js','integration.js','production.js','node-composer.js','interaction.js','node-composer.css','workbench.css','project-name.js','style.css'):
+            content=content.replace('<head>','<head><base href="/studio/">',1)
+            for asset_name in ('app.js','usability.js','workflow.js','integration.js','production.js','node-composer.js','interaction.js','tokens.css','project-name.js','style.css'):
                 content=content.replace('"'+asset_name+'"','"'+asset_name+'?v='+str((studio.folder/asset_name).stat().st_mtime_ns)+'"')
             response=HTMLResponse(content,headers={'Cache-Control':'no-store'})
             response.set_cookie('studio_media',_SESSION_TOKEN,httponly=True,samesite='strict',path='/studio/media')

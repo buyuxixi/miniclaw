@@ -248,6 +248,8 @@ class ImagePlans:
 
     def apply(self, project, plan_id, revision):
         with self.canvas.lock:
+            clarification_service = getattr(self.canvas, 'clarifications', None)
+            if clarification_service: clarification_service.guard_manual(project=project)
             with self.canvas.store.connect() as db:
                 plan = self._read(db, project, plan_id)
             self._guard(plan, revision)

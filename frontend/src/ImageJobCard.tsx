@@ -3,6 +3,7 @@ import type { Attachment } from './attachments';
 import { readApi } from './management-api';
 import { imageLabels, jobLabels, useImageBlob, type ImageJob } from './image-api';
 import { ImageDetailReview } from './ImageDetailReview';
+import { ChatImageCanvasAction, type ChatImageCanvasTarget } from './ChatImageCanvasAction';
 
 export function ImageComparison({ owner, source, output }: { owner: string; source: Attachment; output?: Attachment }) {
   const before = useImageBlob(owner, source); const after = useImageBlob(owner, output);
@@ -15,7 +16,7 @@ export function ImageComparison({ owner, source, output }: { owner: string; sour
     {details && before.url && (!output || after.url) && <ImageDetailReview key={`${owner}:${source.id}:${output?.id}`} before={before.url} after={output ? after.url : undefined} onClose={()=>setDetails(false)} />}</>;
 }
 
-export function ImageJobCard({ owner, result, onEdit }: { owner: string; result: unknown; onEdit?: (image: Attachment) => void }) {
+export function ImageJobCard({ owner, result, onEdit, canvasTarget }: { owner: string; result: unknown; onEdit?: (image: Attachment) => void; canvasTarget?: ChatImageCanvasTarget }) {
   let parsed: Partial<ImageJob> = {};
   try { parsed = typeof result === 'string' ? JSON.parse(result) : result as Partial<ImageJob>; } catch { /* invalid tool result */ }
   const initial = parsed?.id && parsed.source && parsed.state ? parsed as ImageJob : undefined;
@@ -38,7 +39,7 @@ export function ImageJobCard({ owner, result, onEdit }: { owner: string; result:
   if (!job) return null;
   return <section className="image-result"><header><strong>{jobLabels[job.state]}</strong><span>{imageLabels[job.operation]} · {job.provider === 'local' ? '本地处理' : '百炼'}</span></header>
     {(job.error || error) && <p role="status">{job.error || error}</p>}
-    {job.state === 'succeeded' && job.output && <><ImageComparison owner={owner} source={job.source} output={job.output} />{onEdit && <button className="secondary-action" onClick={() => onEdit(job.output!)}>继续修改这张图</button>}</>}
+    {job.state === 'succeeded' && job.output && <><ImageComparison owner={owner} source={job.source} output={job.output} />{canvasTarget && <ChatImageCanvasAction key={`${owner}:${canvasTarget.workspace}:${canvasTarget.sessionId}:${job.output.id}`} image={job.output} target={canvasTarget} />}{onEdit && <button className="secondary-action" onClick={() => onEdit(job.output!)}>继续修改这张图</button>}</>}
     {['queued', 'running'].includes(job.state) && <p>原图已保留。可在修图面板查看进度；停止聊天不会自动取消此任务。</p>}
   </section>;
 }

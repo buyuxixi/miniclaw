@@ -4,7 +4,9 @@
 .env.*
 !.env.example
 .codex/
-draft_45d62069_folder/
+draft_*_folder/
+node_modules/
+*.tsbuildinfo
 runtime.local.json
 __pycache__/
 frontend/node_modules/

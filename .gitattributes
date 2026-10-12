@@ -8,3 +8,4 @@
 *.md text eol=lf
 *.yaml text eol=lf
 *.patch text eol=lf
+config/laya/round07-joint-gates.json -text

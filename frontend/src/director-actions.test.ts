@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import {expect,test,vi} from 'vitest';
-import {directImageAction,flipDirectorImage,singleShotPrompt,shotOptimizationMessage,adoptDirectorPrompt,singleImagePrompt,imageOptimizationMessage} from './director-actions';
+import {directImageAction,flipDirectorImage,singleShotPrompt,adoptDirectorPrompt,singleImagePrompt} from './director-actions';
+import {shotOptimizationMessage,imageOptimizationMessage} from './fixtures/legacy-director-prompts';
+test('image feedback optimization acknowledges attached pixels without treating the screenshot as a new working image',()=>{
+  const message=imageOptimizationMessage({name:'人像',prompt:'眼角加痣'},'看红框','image-edit',true);
+  expect(message).toContain('结合图片判断');expect(message).toContain('不默认替换当前工作图');expect(message).not.toContain('这里没有图片像素');
+});
 import {loadProject} from './canvas-api';
 import {writeApi} from './management-api';
 vi.mock('./canvas-api',async()=>({...await vi.importActual('./canvas-api'),loadProject:vi.fn()}));

@@ -1,0 +1,252 @@
+diff --git a/agent/conversation_loop.py b/agent/conversation_loop.py
+index fb79d62..3c23277 100644
+--- a/agent/conversation_loop.py
++++ b/agent/conversation_loop.py
+@@ -1527,6 +1527,12 @@ def _run_conversation_turn(
+         max_compression_attempts=getattr(agent, "max_compression_attempts", 3),
+         **{f.name: getattr(_ctx, f.name.lstrip("_")) for f in fields(_LoopState) if f.name in _CTX_FIELDS},
+     )
++    hosted = getattr(agent, '_hosted_turn_adapter', None)
++    if hosted is not None:
++        waiting = hosted.before_model(s.messages)
++        if waiting is not None:
++            return waiting
++
+     # Opt-in runtime: api_mode == codex_app_server hands the whole turn to the codex
+     # app-server subprocess (see agent/transports/codex_app_server_session.py).
+     if agent.api_mode == "codex_app_server":
+diff --git a/agent/tool_executor.py b/agent/tool_executor.py
+index 7265d18..500df50 100644
+--- a/agent/tool_executor.py
++++ b/agent/tool_executor.py
+@@ -716,6 +716,11 @@ def _dispatch_authorized_once(
+ 
+     from agent.terminal_approval_batch import prepare_current_terminal
+     prepare_current_terminal(ref)
++    # Explicit host boundary, after native policy and before any real dispatch.
++    hosted = getattr(agent, '_hosted_turn_adapter', None)
++    if hosted is not None:
++        _advance_start_order()
++        return hosted.dispatch(ref.name, ref.args, ref.call_id, lambda: execute(ref.args))
+     _advance_start_order(lambda: _begin_tool_execution(agent, ref, display_index))
+     return _run_with_activity_heartbeat(agent, ref.name, lambda: execute(ref.args))
+ 
+diff --git a/agent/turn_tool_round.py b/agent/turn_tool_round.py
+index 10211a8..8dda65a 100644
+--- a/agent/turn_tool_round.py
++++ b/agent/turn_tool_round.py
+@@ -18,6 +18,7 @@ from agent.turn_preflight import compress_after_tool_results
+ from agent.turn_tool_validation import validate_tool_calls
+ 
+ logger = logging.getLogger("agent.conversation_loop")
++HOSTED_TURN_ADAPTER_VERSION = 1
+ 
+ # Post-response housekeeping tools: a round made only of these mutes tool progress.
+ _HOUSEKEEPING_TOOLS = frozenset({"memory", "todo_list", "skill_manage", "session_search"})
+@@ -151,6 +152,9 @@ def run_tool_round(
+         with suppress(Exception):
+             agent.stream_delta_callback(None)
+ 
++    hosted = getattr(agent, '_hosted_turn_adapter', None)
++    if hosted is not None:
++        hosted.prepare_tools(assistant_message.tool_calls)
+     agent._execute_tool_calls(assistant_message, messages, effective_task_id, api_call_count)
+ 
+     if getattr(agent, "_incremental_persistence_failed", False):
+@@ -161,6 +165,13 @@ def run_tool_round(
+         failed = True
+         return _verdict("break")
+ 
++    # All emitted calls now have canonical results. Yield before post-tool compression
++    # and the next model request. Only the opted-in host owns this business pause.
++    if hosted is not None:
++        waiting = hosted.wait_result(messages, api_call_count)
++        if waiting is not None:
++            return _verdict('return', waiting)
++
+     if agent._tool_guardrail_halt_decision is not None:
+         decision = agent._tool_guardrail_halt_decision
+         _turn_exit_reason = "guardrail_halt"
+diff --git a/apps/shared/src/gateway-contract.generated.ts b/apps/shared/src/gateway-contract.generated.ts
+index 014b14d..9ae1d10 100644
+--- a/apps/shared/src/gateway-contract.generated.ts
++++ b/apps/shared/src/gateway-contract.generated.ts
+@@ -4369,7 +4369,7 @@ export interface MessageCompletePayload {
+   persisted_turn?: PersistedTurn | null
+ }
+ /** ``prompt_turn._result_status``. */
+-export type TurnStatus = 'complete' | 'error' | 'interrupted'
++export type TurnStatus = 'complete' | 'error' | 'interrupted' | 'awaiting_input'
+ /** ``agent/billing_links.py::BillingBlock.to_dict`` (+ ``unverified`` from conversation_loop). */
+ export interface BillingBlock {
+   provider: string
+diff --git a/apps/shared/src/gateway-contract.openrpc.json b/apps/shared/src/gateway-contract.openrpc.json
+index 6a081c7..df62a9d 100644
+--- a/apps/shared/src/gateway-contract.openrpc.json
++++ b/apps/shared/src/gateway-contract.openrpc.json
+@@ -35047,7 +35047,8 @@
+         "enum": [
+           "complete",
+           "error",
+-          "interrupted"
++          "interrupted",
++          "awaiting_input"
+         ],
+         "title": "TurnStatus",
+         "type": "string"
+diff --git a/run_agent.py b/run_agent.py
+index 83f121f..51bc364 100644
+--- a/run_agent.py
++++ b/run_agent.py
+@@ -1332,7 +1332,7 @@ class AIAgent(
+         self._executing_tools = True  # allow _vprint during tool execution even with stream consumers
+         try:
+             with scoped_connection_surface(agent_connection_surface(self)):
+-                if len(tool_calls) <= 1:
++                if len(tool_calls) <= 1 or getattr(self, '_hosted_turn_adapter', None) is not None:
+                     self._execute_tool_calls_sequential(*args)
+                 else:
+                     from agent.tool_dispatch_helpers import _plan_tool_batch_segments
+diff --git a/tui_gateway/contracts/events.py b/tui_gateway/contracts/events.py
+index 7408c88..45ad7b7 100644
+--- a/tui_gateway/contracts/events.py
++++ b/tui_gateway/contracts/events.py
+@@ -140,6 +140,7 @@ class TurnStatus(WireEnum):
+     complete = "complete"
+     error = "error"
+     interrupted = "interrupted"
++    awaiting_input = "awaiting_input"
+ 
+ 
+ class ErrorSurface(Payload):
+diff --git a/tui_gateway/methods_prompt.py b/tui_gateway/methods_prompt.py
+index aefcf69..aa0efb8 100644
+--- a/tui_gateway/methods_prompt.py
++++ b/tui_gateway/methods_prompt.py
+@@ -444,7 +444,7 @@ def _storage_error_data(failure, raw) -> dict:
+     return {"code": failure.code, "cause": failure.cause, "details": storage_failure_details(raw)}
+ 
+ 
+-def _persist_session_row_for_submit(rid, session, text=None, display_kind=None):
++def _persist_session_row_for_submit(rid, session, text=None, display_kind=None, display_metadata=None):
+     """Lazily persist the DB row now that the user sent a message (a branch becomes real
+     here), then the message itself (#111868: a freeze during the first build must leave a
+     resumable transcript); the error reply is the only user-visible signal (desktop maps it to a toast)."""
+@@ -459,7 +459,10 @@ def _persist_session_row_for_submit(rid, session, text=None, display_kind=None):
+                 data=_storage_error_data(failure, _db_error))
+         else:
+             _persist_branch_seed(session)
+-            _persist_submit_user_row(session, text, display_kind)
++            if display_metadata:
++                _persist_submit_user_row(session, text, display_kind, display_metadata)
++            else:
++                _persist_submit_user_row(session, text, display_kind)
+             return None
+     except Exception as exc:
+         failure = describe_storage_failure(exc)
+@@ -585,6 +588,10 @@ def _(rid, params: dict) -> dict:
+     session, err = _sess_nowait(params, rid)
+     if err:
+         return err
++    # Host stamps identifiers from server-owned state, never arbitrary RPC metadata.
++    host_metadata = session.get('_hosted_prompt_metadata')
++    if callable(host_metadata):
++        display_metadata = {**(display_metadata or {}), **host_metadata()}
+     from tools.bot_relay import DeliveryAuthor
+ 
+     # Only the relay handler can build a DeliveryAuthor. A dict here is a client claiming a sender.
+@@ -681,7 +688,11 @@ def _(rid, params: dict) -> dict:
+         logger.warning(
+             "compute-host dispatch failed for session %s; falling back inline: %s", sid,
+             isolated_response["error"].get("message", "unknown error"))
+-    if (err := _persist_session_row_for_submit(rid, session, text, display_kind)) is not None:
++    if callable(host_metadata):
++        err = _persist_session_row_for_submit(rid, session, text, display_kind, display_metadata)
++    else:
++        err = _persist_session_row_for_submit(rid, session, text, display_kind)
++    if err is not None:
+         return err
+     # Capture before starting the worker: it consumes the staging dict and may finish before the RPC returns.
+     staged_user = session.get("_submit_user_row") or {}
+diff --git a/tui_gateway/prompt_turn.py b/tui_gateway/prompt_turn.py
+index 32cad04..acc8028 100644
+--- a/tui_gateway/prompt_turn.py
++++ b/tui_gateway/prompt_turn.py
+@@ -303,7 +303,8 @@ def _commit_turn_history(
+ 
+ def _result_status(result: dict) -> str:
+     return (
+-        "interrupted" if result.get("interrupted")
++        "awaiting_input" if result.get('awaiting_input')
++        else "interrupted" if result.get("interrupted")
+         else "error" if result.get("error") else "complete")
+ 
+ 
+@@ -435,6 +436,8 @@ def _run_post_turn_followups(
+     prompt wins over every auto follow-up (drain it, skip the rest); a leftover /steer is
+     requeued first so it isn't dropped; then goal continuation, then completion
+     notifications.  Each nested submit re-checks ``running`` under the lock."""
++    if isinstance(result, dict) and result.get('awaiting_input'):
++        return
+     steer = result.get("pending_steer") if isinstance(result, dict) else None
+     if isinstance(steer, str) and steer.strip():
+         with session["history_lock"]:
+@@ -1032,7 +1035,7 @@ def _run_prompt_submit(
+         st = _TurnRun(
+             session["agent"], session.pop("one_turn_model_restore", None), terminal_callback,
+             receipt_committed=terminal_callback is None)
+-        st.marker_key = _record_turn_marker(session, text, auto_continue=terminal_callback is None,
++        st.marker_key = _record_turn_marker(session, text, auto_continue=terminal_callback is None and getattr(st.agent, '_hosted_turn_adapter', None) is None,
+             notification_category=(display_metadata or {}).get("notification_category"))
+         goal_followup = None
+         try:
+@@ -1050,6 +1053,9 @@ def _run_prompt_submit(
+                 display_metadata, turn_author, text)
+             status_note = _absorb_turn_result(
+                 sid, session, st, text, display_kind, display_metadata)
++            hosted = getattr(st.agent, '_hosted_turn_adapter', None)
++            if hosted is not None:
++                hosted.finish(st.result, session.get('session_key'), status_note)
+             payload, raw, status = _complete_turn_payload(session, st, status_note, cols)
+             _emit("message.complete", sid, payload)
+             goal_followup = _goal_followup_after_turn(sid, session, st.result, status, raw)
+@@ -1060,6 +1066,9 @@ def _run_prompt_submit(
+             _publish_session_control_snapshot(sid, session, only_if_present=True)
+         except Exception as e:
+             _recover_turn_exception(sid, session, st, e)
++            hosted = getattr(st.agent, '_hosted_turn_adapter', None)
++            if hosted is not None:
++                hosted.finish(st.result, session.get('session_key'), 'turn failed before settlement')
+         finally:
+             _finish_turn(sid, session, st)
+             _current_runtime_session_record.reset(runtime_session_token)
+diff --git a/tui_gateway/session_workdir.py b/tui_gateway/session_workdir.py
+index c919675..3747c85 100644
+--- a/tui_gateway/session_workdir.py
++++ b/tui_gateway/session_workdir.py
+@@ -345,7 +345,7 @@ def _persist_branch_seed(session: dict) -> None:
+             _workdir_reraise_disk_full(exc, "branch seed persist failed")
+ 
+ 
+-def _persist_submit_user_row(session: dict, text: Any, display_kind: str | None) -> None:
++def _persist_submit_user_row(session: dict, text: Any, display_kind: str | None, display_metadata: dict | None = None) -> None:
+     """Write the submitted user turn at send time, before the agent build and turn: the agent's own
+     crash persist only runs once the build finished, so quitting a frozen app during a slow first build
+     left a session row with no message (#111868). The dict is staged on the session already stamped
+@@ -361,12 +361,15 @@ def _persist_submit_user_row(session: dict, text: Any, display_kind: str | None)
+     staged = stamp_message_timestamp({"role": "user", "content": text})
+     if display_kind:
+         staged["display_kind"] = display_kind
++    if display_metadata:
++        staged['display_metadata'] = display_metadata
+     with _session_db(session) as db:
+         if db is None:
+             return
+         try:
+             staged["_row_id"] = db.append_message(
+-                key, "user", content=text, display_kind=display_kind, timestamp=staged["timestamp"])
++                key, "user", content=text, display_kind=display_kind, timestamp=staged["timestamp"],
++                **({'display_metadata':display_metadata} if display_metadata else {}))
+         except Exception as exc:
+             _workdir_reraise_disk_full(exc, "submit-time user row persist failed")
+             return

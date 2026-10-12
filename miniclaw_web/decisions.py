@@ -79,10 +79,10 @@ class JevDecisions:
                     estimated_usd=sum(json.loads(r[1]).get('estimated_micro_usd', 0) for r in rows) / 1e6,
                     limit_usd=self.config.budget_micro_usd / 1e6, max_calls=self.config.max_calls)
 
-    def evaluate(self, scope, request_id, instruction, snapshot, selected=None):
+    def evaluate(self, scope, request_id, instruction, snapshot, selected=None, *, request=None, question_version=QUESTION_VERSION):
         if not isinstance(request_id, str) or not 8 <= len(request_id) <= 80:
             raise ValueError('需要稳定的决策请求标识')
-        state, questions = decision_request(instruction, snapshot, selected)
+        state, questions = request if request is not None else decision_request(instruction, snapshot, selected)
         payload = dict(model=self.config.model, state=state, questions=questions)
         encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()
         if len(encoded) > 12_000:
@@ -91,7 +91,7 @@ class JevDecisions:
         # Conservative byte-based estimate, including repeated state per question.
         # This is a local estimate, never a promise about the provider invoice.
         reserve = math.ceil(len(encoded) * (len(questions) + 1) * PRICE_USD_PER_MILLION)
-        result = dict(id=request_id, project_revision=snapshot['revision'], question_version=QUESTION_VERSION,
+        result = dict(id=request_id, project_revision=snapshot['revision'], question_version=question_version,
                       status='pending', mode='advisory', fallback='manual_or_director', created=time.time())
         with self.store.connect() as db:
             db.execute('BEGIN IMMEDIATE')

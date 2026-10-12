@@ -197,6 +197,7 @@ export default function CanvasApp({
   const [layoutCandidate, setLayoutCandidate] = useState<LayoutCandidate>();
   const [cropCandidate, setCropCandidate] = useState<CropCandidate>();
   const [size, setSize] = useState({ width: 800, height: 600 });
+  const [selectionColor, setSelectionColor] = useState<string>();
   const host = useRef<HTMLDivElement>(null);
   const upload = useRef<HTMLInputElement>(null);
   const importNonce = useRef<number | undefined>(undefined);
@@ -272,18 +273,19 @@ export default function CanvasApp({
   }
   function fit(doc = project?.document) {
     if (!doc) return;
+    const availableHeight = Math.max(1, size.height - (workspaceHost ? 56 : 0));
     const scale = Math.max(
       0.04,
       Math.min(
         1,
         (size.width - 80) / doc.width,
-        (size.height - 80) / doc.height,
+        (availableHeight - 80) / doc.height,
       ),
     );
     setView({
       scale,
       x: (size.width - doc.width * scale) / 2,
-      y: (size.height - doc.height * scale) / 2,
+      y: (availableHeight - doc.height * scale) / 2,
     });
   }
   async function run(work: () => Promise<void>) {
@@ -465,7 +467,12 @@ export default function CanvasApp({
   }, [project?.id]);
   useEffect(() => {
     if (project) fit(project.document);
-  }, [project?.id, size.width, size.height]);
+  }, [project?.id, size.width, size.height, !!workspaceHost]);
+  useEffect(() => {
+    setSelectionColor(workspaceHost && host.current
+      ? getComputedStyle(host.current).getPropertyValue('--ca-blue').trim() || undefined
+      : undefined);
+  }, [project?.id, !!workspaceHost]);
   useEffect(() => {
     let alive = true;
     let timer: ReturnType<typeof setTimeout>;
@@ -1046,6 +1053,7 @@ export default function CanvasApp({
                 onPath={select}
                 onCrop={crop}
                 size={size}
+                selectionColor={selectionColor}
               />
               {!project.document.layers.length && (
                 <div className="canvas-start">
